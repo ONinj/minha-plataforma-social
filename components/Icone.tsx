@@ -67,6 +67,20 @@ const CAMINHOS: Record<string, React.ReactNode> = {
     </>
   ),
   mais: <path d="M12 5v14M5 12h14" />,
+  biblioteca: (
+    <>
+      <rect x="3" y="4" width="4" height="16" rx="1" />
+      <rect x="9" y="4" width="4" height="16" rx="1" />
+      <path d="m15.5 5.2 3.8-1 3 15.4-3.8 1z" />
+    </>
+  ),
+  microfone: (
+    <>
+      <rect x="9" y="2.5" width="6" height="12" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3.5" />
+    </>
+  ),
+  parar: <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />,
   seta: <path d="m6 9 6 6 6-6" />,
   setaDir: <path d="m9 6 6 6-6 6" />,
   setaEsq: <path d="m15 6-6 6 6 6" />,

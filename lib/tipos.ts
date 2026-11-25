@@ -20,6 +20,18 @@ export type Midia = {
   /** Imagem de IA liberada pelo usuário para servir de referência ao gerente. */
   referenciaAprovada?: boolean;
   favorita?: boolean;
+  /** Biblioteca de referências (arquivos do usuário organizados em pastas). */
+  naBiblioteca?: boolean;
+  pasta?: string;
+  descricao?: string;
+  tags?: string;
+  /** Quantos quadros (miniaturas) foram extraídos do vídeo para o Claude enxergar. */
+  quadros?: number;
+  duracao?: number;
+  driveId?: string;
+  /** Endereço do arquivo já enviado ao fal.ai (reaproveitado por alguns dias). */
+  falUrl?: string;
+  falUrlEm?: string;
   /** Acompanhamento ao vivo da produção (vídeos). */
   iniciadoEm?: string;
   prontoEm?: string;
@@ -76,6 +88,8 @@ export type TextoSalvo = { id: string; titulo: string; texto: string; tipo: "has
 export type Configuracoes = {
   chaveAnthropic: string;
   chaveFal: string;
+  /** Chave de API do Google Cloud só para ler pastas públicas do Google Drive (opcional). */
+  chaveDrive: string;
   modeloClaude: string;
   esforcoGerente: "low" | "medium" | "high" | "xhigh" | "max";
   modeloImagemFal: string;
@@ -152,6 +166,7 @@ export const CORES = ["#8b5cf6", "#06b6d4", "#f43f5e", "#f59e0b", "#10b981", "#3
 export const CONFIG_PADRAO: Configuracoes = {
   chaveAnthropic: "",
   chaveFal: "",
+  chaveDrive: "",
   modeloClaude: "claude-opus-5-5",
   esforcoGerente: "medium",
   modeloImagemFal: "fal-ai/nano-banana-2",

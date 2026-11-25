@@ -13,10 +13,21 @@ const NOMES_ORIGEM: Record<Midia["origem"], string> = {
 };
 
 export function VisualMidia({ midia, controles = false }: { midia: Midia; controles?: boolean }) {
-  const urlLocal = useUrlMidia(midia.status === "pronto" ? midia.id : undefined, midia.status);
+  // Em miniaturas, vídeos da biblioteca mostram o quadro extraído (mais leve que carregar o vídeo).
+  const usarQuadro = !controles && midia.tipo === "video" && !!midia.quadros;
+  const urlLocal = useUrlMidia(midia.status === "pronto" ? (usarQuadro ? `${midia.id}_q0` : midia.id) : undefined, midia.status);
   const url = urlLocal ?? midia.urlExterna;
 
   if (midia.status === "gerando") return <ProducaoAoVivo midia={midia} />;
+  if (usarQuadro && urlLocal) {
+    return (
+      <div className="visual" style={{ position: "relative" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={urlLocal} alt={midia.titulo} />
+        {midia.duracao && <span className="selo" style={{ left: "auto", right: 7, top: "auto", bottom: 7 }}>{Math.round(midia.duracao)}s</span>}
+      </div>
+    );
+  }
   if (midia.status === "erro") {
     return (
       <div className="visual" style={{ color: "var(--erro)", fontSize: 12, padding: 8, textAlign: "center" }}>

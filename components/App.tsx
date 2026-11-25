@@ -6,6 +6,7 @@ import { StoreProvider, totalContaMes, totalMes, useStore } from "@/lib/store";
 import { brl } from "@/lib/util";
 import Agendamentos from "./abas/Agendamentos";
 import Aprovacoes from "./abas/Aprovacoes";
+import Biblioteca from "./abas/Biblioteca";
 import ClaudeDireto from "./abas/ClaudeDireto";
 import Configuracoes from "./abas/Configuracoes";
 import Gemini from "./abas/Gemini";
@@ -28,6 +29,7 @@ export type IdAba =
   | "aprovacoes"
   | "agendamentos"
   | "midias"
+  | "biblioteca"
   | "ideias"
   | "perfis"
   | "config";
@@ -52,6 +54,7 @@ const SECOES: { titulo?: string; abas: Aba[] }[] = [
       { id: "aprovacoes", nome: "Aprovações", icone: "aprovar", descricao: "O que o gerente entregou esperando o seu OK" },
       { id: "agendamentos", nome: "Calendário", icone: "calendario", descricao: "O que está a programar, programado e postado" },
       { id: "midias", nome: "Mídias e envios", icone: "pasta", descricao: "Suas fotos e vídeos e tudo o que as IAs criaram" },
+      { id: "biblioteca", nome: "Biblioteca", icone: "biblioteca", descricao: "Seus vídeos e fotos prontos, em pastas, para o gerente usar de referência" },
       { id: "ideias", nome: "Ideias e textos", icone: "ideia", descricao: "Banco de ideias, hashtags e legendas salvas" },
     ],
   },
@@ -240,6 +243,14 @@ function Plataforma() {
           {aba === "agendamentos" && <Agendamentos />}
           {aba === "midias" && (
             <Midias
+              mandarParaCentral={(ids) => {
+                setAnexosParaGerente(ids);
+                ir("central");
+              }}
+            />
+          )}
+          {aba === "biblioteca" && (
+            <Biblioteca
               mandarParaCentral={(ids) => {
                 setAnexosParaGerente(ids);
                 ir("central");

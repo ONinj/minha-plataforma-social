@@ -98,6 +98,15 @@ export const FERRAMENTAS: Anthropic.Beta.BetaTool[] = [
         prompt: { type: "string", description: "Prompt detalhado: cena, ação, câmera, estilo, áudio" },
         proporcao: { type: "string", enum: ["9:16", "16:9"] },
         imagem_inicial: { type: "string", description: "Id de uma imagem para servir de primeiro quadro / referência" },
+        video_referencia: {
+          type: "string",
+          description:
+            "Id de um vídeo da biblioteca para o Seedance usar como referência de movimento/cena (só com provedor 'seedance'). No prompt, chame-o de @Video1 (e a imagem inicial de @Image1).",
+        },
+        trecho_inicio_s: {
+          type: "number",
+          description: "Para vídeos de referência longos: segundo a partir do qual recortar o trecho (até 15 s são usados).",
+        },
       },
       required: ["titulo", "provedor", "prompt", "proporcao"],
     },
@@ -122,6 +131,28 @@ export const FERRAMENTAS: Anthropic.Beta.BetaTool[] = [
     },
   },
   {
+    name: "buscar_biblioteca",
+    description:
+      "Procura na biblioteca de referências do perfil (vídeos e fotos reais do usuário, organizados em pastas). Sem consulta, lista as pastas. Devolve id, nome, pasta, duração e descrição de cada item. Use ver_biblioteca para olhar os itens antes de escolher.",
+    input_schema: {
+      type: "object",
+      properties: {
+        consulta: { type: "string", description: "Palavras para buscar no nome, pasta, descrição e tags (ex.: 'troca de tela iphone')" },
+        pasta: { type: "string", description: "Limitar a uma pasta" },
+      },
+    },
+  },
+  {
+    name: "ver_biblioteca",
+    description:
+      "Mostra até 6 itens da biblioteca: para vídeos, 4 quadros espalhados pelo vídeo (do início ao fim); para fotos, a própria foto. Use para escolher o melhor vídeo de referência.",
+    input_schema: {
+      type: "object",
+      properties: { ids: { type: "array", items: { type: "string" }, description: "Ids dos itens (máx. 6)" } },
+      required: ["ids"],
+    },
+  },
+  {
     name: "listar_agendamentos",
     description: "Mostra o que já está aprovado/programado/postado no calendário e o que está esperando aprovação.",
     input_schema: { type: "object", properties: {} },
@@ -139,6 +170,7 @@ async function executar(
   store: Store,
   bloco: Anthropic.Beta.BetaToolUseBlock,
   interacoes: Interacoes,
+  aoEtapa?: (t: string) => void,
 ): Promise<ResultadoFerramenta> {
   const entrada = bloco.input as Record<string, unknown>;
   const ok = (content: ResultadoFerramenta["content"]): ResultadoFerramenta => ({
@@ -206,6 +238,9 @@ async function executar(
           prompt: String(entrada.prompt ?? ""),
           proporcao: entrada.proporcao as string | undefined,
           imagemId: entrada.imagem_inicial as string | undefined,
+          videoReferenciaId: entrada.video_referencia as string | undefined,
+          trechoInicio: entrada.trecho_inicio_s as number | undefined,
+          aoEtapa,
           pedidoPor: "gerente",
         });
         return ok(`Vídeo em produção [midia:${midia.id}]. Fica pronto em alguns minutos; inclua este id nas mídias da aprovação.`);
@@ -232,6 +267,60 @@ async function executar(
         return ok(`Enviado para aprovação (id ${item.id}).`);
       }
 
+      case "buscar_biblioteca": {
+        const itens = store.obter().midias.filter((m) => m.naBiblioteca);
+        if (!itens.length) return ok("A biblioteca deste perfil está vazia. Peça ao usuário para enviar os arquivos na aba Biblioteca.");
+        const pasta = String(entrada.pasta ?? "").toLowerCase();
+        const termos = String(entrada.consulta ?? "")
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((t) => t.length > 1);
+        if (!termos.length && !pasta) {
+          const pastas = new Map<string, number>();
+          itens.forEach((m) => pastas.set(m.pasta ?? "Geral", (pastas.get(m.pasta ?? "Geral") ?? 0) + 1));
+          return ok(`Pastas da biblioteca (${itens.length} itens):\n${[...pastas].map(([p, n]) => `- ${p} (${n})`).join("\n")}`);
+        }
+        const pontuados = itens
+          .filter((m) => !pasta || (m.pasta ?? "").toLowerCase().includes(pasta))
+          .map((m) => {
+            const texto = `${m.titulo} ${m.pasta} ${m.descricao ?? ""} ${m.tags ?? ""}`.toLowerCase();
+            return { m, pontos: termos.length ? termos.filter((t) => texto.includes(t)).length : 1 };
+          })
+          .filter((x) => x.pontos > 0)
+          .sort((a, b) => b.pontos - a.pontos)
+          .slice(0, 30);
+        if (!pontuados.length) return ok("Nada encontrado com essas palavras. Tente outros termos ou liste as pastas (sem consulta).");
+        const linhas = pontuados.map(
+          ({ m }) =>
+            `- [midia:${m.id}] ${m.tipo === "video" ? "🎬" : "🖼"} "${m.titulo}" · pasta: ${m.pasta}${m.duracao ? ` · ${Math.round(m.duracao)}s` : ""}${m.descricao ? ` · ${m.descricao}` : ""}${m.tags ? ` · tags: ${m.tags}` : ""}`,
+        );
+        return ok(`${pontuados.length} resultado(s):\n${linhas.join("\n")}`);
+      }
+
+      case "ver_biblioteca": {
+        const ids = ((entrada.ids as string[]) ?? []).slice(0, 6);
+        const conteudo: Exclude<ResultadoFerramenta["content"], string | undefined> = [];
+        for (const id of ids) {
+          const m = store.obter().midias.find((x) => x.id === id);
+          if (!m) {
+            conteudo.push({ type: "text", text: `${id}: não encontrado.` });
+            continue;
+          }
+          conteudo.push({
+            type: "text",
+            text: `[midia:${m.id}] "${m.titulo}" (${m.tipo}${m.duracao ? `, ${Math.round(m.duracao)}s` : ""}, pasta ${m.pasta ?? "-"})${m.descricao ? `: ${m.descricao}` : ""}`,
+          });
+          const chaves = m.quadros ? Array.from({ length: m.quadros }, (_, i) => `${m.id}_q${i}`) : m.tipo === "imagem" ? [m.id] : [];
+          for (const chave of chaves) {
+            const blob = await store.lerBlob(chave);
+            if (!blob) continue;
+            const pequena = await reduzirImagem(blob, 480, 0.72);
+            conteudo.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: await blobParaBase64(pequena) } });
+          }
+        }
+        return ok(conteudo);
+      }
+
       case "listar_agendamentos": {
         const { agendamentos, aprovacoes } = store.obter();
         const resumo = {
@@ -252,7 +341,8 @@ async function executar(
       case "listar_midias": {
         const lista = store
           .obter()
-          .midias.slice(0, 40)
+          .midias.filter((m) => !m.naBiblioteca)
+          .slice(0, 40)
           .map((m) => ({ id: m.id, tipo: m.tipo, titulo: m.titulo, origem: m.origem, status: m.status }));
         return ok(JSON.stringify(lista, null, 1));
       }
@@ -316,7 +406,7 @@ export async function rodarGerente(
     const resultados: ResultadoFerramenta[] = [];
     for (const chamada of chamadas) {
       aoMudarEtapa(descreverEtapa(chamada));
-      resultados.push(await executar(store, chamada, interacoes));
+      resultados.push(await executar(store, chamada, interacoes, aoMudarEtapa));
     }
     adicionarMensagem(store, { role: "user", content: resultados });
   }
@@ -332,6 +422,10 @@ function descreverEtapa(b: Anthropic.Beta.BetaToolUseBlock): string {
       return `${e.provedor === "seedance" ? "Seedance" : "Veo"} recebendo o vídeo: ${e.titulo ?? ""}...`;
     case "enviar_para_aprovacao":
       return `Enviando para aprovação: ${e.titulo ?? ""}...`;
+    case "buscar_biblioteca":
+      return `Procurando na biblioteca${e.consulta ? `: "${e.consulta}"` : ""}...`;
+    case "ver_biblioteca":
+      return "Olhando os vídeos da biblioteca...";
     default:
       return "Consultando a plataforma...";
   }

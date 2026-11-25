@@ -5,6 +5,7 @@ import type { MensagemClaude } from "@/lib/tipos";
 import Markdown from "./Markdown";
 import { formatarTempo, useAgora } from "@/lib/progresso";
 import Icone from "./Icone";
+import Microfone from "./Microfone";
 import { MidiaPorId } from "./MidiaView";
 import SeletorMidias, { useUpload } from "./SeletorMidias";
 
@@ -13,7 +14,9 @@ const NOMES_FERRAMENTAS: Record<string, string> = {
   gerar_video: "Pediu um vídeo",
   enviar_para_aprovacao: "Enviou para aprovação",
   listar_agendamentos: "Consultou o calendário",
-  listar_midias: "Consultou a biblioteca de mídias",
+  listar_midias: "Consultou as mídias",
+  buscar_biblioteca: "Procurou na biblioteca",
+  ver_biblioteca: "Olhou vídeos da biblioteca",
 };
 
 function idsDeMidia(texto: string): string[] {
@@ -59,9 +62,10 @@ function Mensagem({ msg }: { msg: MensagemClaude }) {
             <div key={i} className={`ferramenta ${bloco.is_error ? "erro" : ""}`}>
               {ids.length > 0 && !bloco.is_error ? (
                 <div className="linha">
-                  {ids.map((id) => (
+                  {ids.slice(0, 8).map((id) => (
                     <MidiaPorId key={id} id={id} />
                   ))}
+                  {ids.length > 8 && <span className="etiqueta">+{ids.length - 8}</span>}
                 </div>
               ) : (
                 <span>{bloco.is_error ? `⚠️ ${curto}` : `✓ ${curto}`}</span>
@@ -142,8 +146,12 @@ export default function ChatClaudeView({
     if (anexosIniciais?.length) setAnexos((a) => [...new Set([...a, ...anexosIniciais])]);
   }, [anexosIniciais]);
 
-  function enviar() {
-    const t = texto.trim();
+  // Texto que já estava na caixa quando você começou a falar.
+  const baseFala = useRef<string | null>(null);
+  const juntar = (a: string, b: string) => [a.trim(), b.trim()].filter(Boolean).join(" ");
+
+  function enviar(textoFalado?: string) {
+    const t = (textoFalado ?? texto).trim();
     if ((!t && !anexos.length) || ocupado) return;
     setTexto("");
     setAnexos([]);
@@ -193,6 +201,19 @@ export default function ChatClaudeView({
             <Icone nome="clipe" />
           </button>
         )}
+        <Microfone
+          desativado={ocupado}
+          aoParcial={(fala) => {
+            if (baseFala.current === null) baseFala.current = texto;
+            setTexto(juntar(baseFala.current, fala));
+          }}
+          aoFinal={(fala) => {
+            const final = juntar(baseFala.current ?? texto, fala);
+            baseFala.current = null;
+            setTexto(final);
+            enviar(final);
+          }}
+        />
         <textarea
           value={texto}
           placeholder={placeholder}
@@ -210,7 +231,7 @@ export default function ChatClaudeView({
             }
           }}
         />
-        <button className="botao" onClick={enviar} disabled={ocupado || (!texto.trim() && !anexos.length)} aria-label="Enviar">
+        <button className="botao" onClick={() => enviar()} disabled={ocupado || (!texto.trim() && !anexos.length)} aria-label="Enviar">
           <Icone nome="enviar" tamanho={16} />
         </button>
       </div>

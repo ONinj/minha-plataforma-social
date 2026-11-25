@@ -5,6 +5,7 @@ import { custoEstimadoVideo, iniciarVideo } from "@/lib/servicos";
 import { useStore } from "@/lib/store";
 import { brl, formatarData } from "@/lib/util";
 import { BotaoBaixar, CartaoMidia, CartaoProducao, MidiaPorId } from "../MidiaView";
+import Microfone from "../Microfone";
 import SeletorMidias from "../SeletorMidias";
 
 export default function Video({ provedor }: { provedor: "veo" | "seedance" }) {
@@ -79,7 +80,10 @@ export default function Video({ provedor }: { provedor: "veo" | "seedance" }) {
           <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex.: Reels apresentação" />
         </div>
         <div className="campo">
-          <label>Prompt</label>
+          <label className="linha" style={{ justifyContent: "space-between" }}>
+            Prompt
+            <Microfone aoParcial={(fala) => setPrompt(fala)} aoFinal={(fala) => setPrompt(fala)} />
+          </label>
           <textarea
             rows={5}
             value={prompt}

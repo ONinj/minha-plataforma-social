@@ -3,6 +3,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { useStore } from "./store";
 import { PRECOS_CLAUDE, type Configuracoes, type MensagemClaude, type Midia } from "./tipos";
+import { recortarVideo, urlNoFal } from "./biblioteca";
 import { agoraISO, base64ParaBlob, blobParaBase64, novoId, reduzirImagem } from "./util";
 
 type Store = ReturnType<typeof useStore>;
@@ -37,13 +38,15 @@ export async function chamarClaude(
     messages: MensagemClaude[];
     tools?: Anthropic.Beta.BetaTool[];
     effort?: Configuracoes["esforcoGerente"];
+    /** Usa outro modelo nesta chamada (ex.: Haiku para tarefas simples e baratas). */
+    modelo?: string;
   },
 ): Promise<Anthropic.Beta.BetaMessage> {
   const config = store.obter().config;
   if (!config.chaveAnthropic) throw new Error("Cadastre a chave da Anthropic em Configurações.");
   const resposta = await postJSON<Anthropic.Beta.BetaMessage>(
     "/api/claude",
-    { model: config.modeloClaude, ...params },
+    { model: params.modelo ?? config.modeloClaude, system: params.system, messages: params.messages, tools: params.tools, effort: params.effort },
     hAnthropic(config),
   );
   store.registrarGasto("claude", custoClaude(resposta));
@@ -143,9 +146,34 @@ export async function iniciarVideo(
     proporcao?: string;
     duracao?: string;
     pedidoPor?: Midia["pedidoPor"];
+    /** Vídeo da biblioteca para o Seedance usar como referência. */
+    videoReferenciaId?: string;
+    trechoInicio?: number;
+    aoEtapa?: (texto: string) => void;
   },
 ): Promise<Midia> {
   const config = store.obter().config;
+  let videoReferenciaUrl: string | undefined;
+  if (params.videoReferenciaId) {
+    if (params.provedor !== "seedance") throw new Error("Só o Seedance aceita vídeo de referência. Use provedor 'seedance'.");
+    const ref = store.obter().midias.find((m) => m.id === params.videoReferenciaId);
+    if (!ref || ref.tipo !== "video") throw new Error("Vídeo de referência não encontrado na biblioteca.");
+    if (!config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
+    const longo = (ref.duracao ?? 0) > 30;
+    if (longo || (params.trechoInicio ?? 0) > 0) {
+      const inicio = Math.max(0, Math.min(params.trechoInicio ?? 0, (ref.duracao ?? 15) - 3));
+      const segundos = Math.min(15, (ref.duracao ?? 15) - inicio);
+      params.aoEtapa?.(`Recortando ${Math.round(segundos)}s de "${ref.titulo}" a partir de ${Math.round(inicio)}s...`);
+      const blob = await store.lerBlob(ref.id);
+      if (!blob) throw new Error("Arquivo do vídeo de referência não encontrado.");
+      const trecho = await recortarVideo(blob, inicio, segundos);
+      params.aoEtapa?.("Enviando o trecho para o Seedance...");
+      videoReferenciaUrl = await urlNoFal(store, ref, trecho);
+    } else {
+      params.aoEtapa?.(`Enviando "${ref.titulo}" para o Seedance...`);
+      videoReferenciaUrl = await urlNoFal(store, ref);
+    }
+  }
   let imagem: { mimeType: string; base64: string } | undefined;
   if (params.imagemId) {
     const inline = await midiaParaInline(store, params.imagemId, 1920);
@@ -167,6 +195,7 @@ export async function iniciarVideo(
       {
         familia: "seedance",
         modelo: config.prefixoSeedance,
+        videoReferenciaUrl,
         prompt: params.prompt,
         imagem,
         resolucao: config.resolucaoSeedance,
@@ -190,7 +219,7 @@ export async function iniciarVideo(
     iniciadoEm: agoraISO(),
     fase: "fila",
     pedidoPor: params.pedidoPor ?? "voce",
-    imagemInicial: params.imagemId,
+    imagemInicial: params.imagemId ?? (params.videoReferenciaId ? `${params.videoReferenciaId}_q0` : undefined),
     job,
   };
   store.atualizar((e) => ({ ...e, midias: [midia, ...e.midias] }));

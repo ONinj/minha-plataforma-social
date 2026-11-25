@@ -22,7 +22,7 @@ export default function Inicio({ ir, falarComGerente }: { ir: (a: IdAba) => void
   const pendentes = estado.aprovacoes.filter((a) => a.status === "pendente").length;
   const gerando = estado.midias.filter((m) => m.status === "gerando").length;
   const gasto = totalMes(marca.gastos) * conta.config.cambio;
-  const recentes = estado.midias.filter((m) => m.status === "pronto").slice(0, 8);
+  const recentes = estado.midias.filter((m) => m.status === "pronto" && !m.naBiblioteca).slice(0, 8);
   const ideiasAbertas = estado.ideias.filter((i) => !i.feita).slice(0, 4);
   const mesQueVem = new Date(agora.getFullYear(), agora.getMonth() + 1, 1).toLocaleDateString("pt-BR", { month: "long" });
 

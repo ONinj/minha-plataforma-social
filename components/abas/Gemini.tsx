@@ -7,6 +7,7 @@ import type { MensagemGemini, ParteGemini } from "@/lib/tipos";
 import { brl } from "@/lib/util";
 import { Etapa } from "../ChatClaudeView";
 import Icone from "../Icone";
+import Microfone from "../Microfone";
 import { BotaoBaixar, CartaoMidia, MidiaPorId } from "../MidiaView";
 import SeletorMidias from "../SeletorMidias";
 
@@ -142,6 +143,11 @@ export default function Gemini() {
           }}
         />
         <div className="linha" style={{ gap: 8 }}>
+          <Microfone
+            desativado={ocupado}
+            aoParcial={(fala) => setTexto(fala)}
+            aoFinal={(fala) => enviar(fala)}
+          />
           <button className="botao sec peq" onClick={() => setSeletor(true)}>
             <Icone nome="clipe" tamanho={14} /> Referência
           </button>

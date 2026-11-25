@@ -16,6 +16,7 @@ export default function Midias({ mandarParaCentral }: { mandarParaCentral: (ids:
   const [selecao, setSelecao] = useState<string[]>([]);
   const termo = busca.trim().toLowerCase();
   const midias = store.estado.midias
+    .filter((m) => !m.naBiblioteca)
     .filter((m) =>
       filtro === "todas" ? true : filtro === "minhas" ? m.origem === "upload" : filtro === "favoritas" ? m.favorita : m.tipo === filtro,
     )

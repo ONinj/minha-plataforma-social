@@ -11,6 +11,8 @@ type Corpo = {
   resolucao?: string;
   duracao?: string;
   proporcao?: string;
+  /** Vídeo de referência já enviado ao fal.ai (só Seedance, modo referência). */
+  videoReferenciaUrl?: string;
 };
 
 // Envia um pedido de vídeo (Seedance ou Veo) para a fila do fal.ai e devolve o id do pedido.
@@ -25,7 +27,13 @@ export async function POST(req: Request) {
     if (c.duracao) input.duration = c.duracao;
 
     let endpoint: string;
-    if (c.imagem) {
+    if (c.videoReferenciaUrl) {
+      // Seedance "reference-to-video": anima a partir de um vídeo (e opcionalmente uma imagem).
+      endpoint = `${c.modelo}/reference-to-video`;
+      input.video_urls = [c.videoReferenciaUrl];
+      if (c.imagem) input.image_urls = [await enviarImagemFal(fal, c.imagem)];
+      if (c.proporcao) input.aspect_ratio = c.proporcao;
+    } else if (c.imagem) {
       endpoint = `${c.modelo}/image-to-video`;
       input.image_url = await enviarImagemFal(fal, c.imagem);
       // No Seedance com imagem a proporção segue a da imagem.
