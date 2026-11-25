@@ -1,6 +1,7 @@
 import "server-only";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import postgres from "postgres";
+import { urlSupabase } from "../supabaseUrl";
 
 /**
  * Modo nuvem: ligado quando o Supabase está configurado. Sem ele, a plataforma
@@ -11,7 +12,7 @@ export const MODO_NUVEM = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 let _sql: postgres.Sql | null = null;
 export function sql(): postgres.Sql {
   if (!_sql) {
-    const url = process.env.DATABASE_URL;
+    const url = process.env.DATABASE_URL?.trim();
     if (!url) throw new Error("DATABASE_URL não configurada.");
     // prepare:false é necessário com o pooler do Supabase (modo transação).
     _sql = postgres(url, { prepare: false, max: 3, idle_timeout: 20 });
@@ -49,7 +50,7 @@ async function verificarToken(token: string): Promise<JWTPayload> {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(segredo));
     return payload;
   }
-  if (!jwks) jwks = createRemoteJWKSet(new URL(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/.well-known/jwks.json`));
+  if (!jwks) jwks = createRemoteJWKSet(new URL(`${urlSupabase()}/auth/v1/.well-known/jwks.json`));
   const { payload } = await jwtVerify(token, jwks);
   return payload;
 }

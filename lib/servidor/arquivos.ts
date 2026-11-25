@@ -1,12 +1,13 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
+import { urlSupabase } from "../supabaseUrl";
 import { ErroHttp, type Contexto } from "./contexto";
 
 const BALDE = "midias";
 
 function cliente() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const chave = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = urlSupabase();
+  const chave = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!url || !chave) throw new Error("Supabase não configurado no servidor.");
   return createClient(url, chave, { auth: { persistSession: false } });
 }

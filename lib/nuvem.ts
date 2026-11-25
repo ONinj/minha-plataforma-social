@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { urlSupabase } from "./supabaseUrl";
 
 /** Ligado quando o Supabase está configurado (login, créditos e dados na nuvem). */
 export const MODO_NUVEM = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -8,7 +9,7 @@ export const MODO_NUVEM = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
 let _sb: SupabaseClient | null = null;
 export function supabase(): SupabaseClient {
   if (!_sb) {
-    _sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+    _sb = createClient(urlSupabase(), (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim(), {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
   }
