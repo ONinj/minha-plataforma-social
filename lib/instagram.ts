@@ -59,7 +59,7 @@ export async function agendarNoInstagram(store: Store, a: Agendamento, opcoes: {
     else enviadas.push({ caminho: await enviarArquivo(`pub_${a.id}_${i}.mp4`, blob), tipo: "video" });
   }
   const legenda = [a.legenda, a.hashtags].filter((t) => t?.trim()).join("\n\n");
-  const r = await api<{ status: "agendada" | "publicando" | "publicada" }>("/api/publicacoes", {
+  const r = await api<{ status: "agendada" | "publicando" | "publicada"; via?: string }>("/api/publicacoes", {
     corpo: {
       id: a.id,
       perfil: store.marca.id,
@@ -67,6 +67,7 @@ export async function agendarNoInstagram(store: Store, a: Agendamento, opcoes: {
       tipo: tipoInstagram(a, enviadas.map((e) => e.tipo)),
       legenda,
       midias: enviadas,
+      redes: a.redes,
       agora: opcoes.agora,
     },
   });
@@ -127,35 +128,63 @@ export async function sincronizarPublicacoes(store: Store) {
 
 // ---------------- Hook para as telas ----------------
 
-let cache: Conexao[] | null = null;
-const ouvintes = new Set<(c: Conexao[]) => void>();
-export function atualizarConexoes() {
-  return listarConexoes()
-    .then((c) => {
-      cache = c;
-      ouvintes.forEach((f) => f(c));
-      return c;
-    })
-    .catch(() => [] as Conexao[]);
+export type MarcaMetricool = { perfil_id: string; blog_id: string; nome: string | null; origem: "plataforma" | "propria"; link_conexao: string | null };
+export type SituacaoMetricool = {
+  plataforma: boolean;
+  propria: boolean;
+  marcas: MarcaMetricool[];
+  disponiveis: { blogId: string; nome: string; redes: Record<string, string> }[];
+  erro: string | null;
+};
+type Cache = { conexoes: Conexao[]; metricool: SituacaoMetricool | null };
+
+let cache: Cache | null = null;
+const ouvintes = new Set<(c: Cache) => void>();
+
+/** Busca de novo as conexões do Instagram e a situação do Metricool. */
+export async function atualizarConexoes() {
+  const [conexoes, metricool] = await Promise.all([
+    listarConexoes().catch(() => [] as Conexao[]),
+    api<SituacaoMetricool>("/api/metricool").catch(() => null),
+  ]);
+  cache = { conexoes, metricool };
+  ouvintes.forEach((f) => f(cache!));
+  return cache;
 }
 
-/** Situação do Instagram para o perfil ativo: disponível no plano? conectado? */
+/**
+ * Situação da publicação automática para o perfil ativo.
+ * `destino` diz por onde vai sair: Metricool (da plataforma ou da própria pessoa) ou Instagram direto.
+ */
 export function useInstagram(store: Store) {
   const n = store.nuvem;
-  const disponivel = !!n && !!n.recursos.instagram && n.instagramConfigurado;
-  const [conexoes, setConexoes] = useState<Conexao[] | null>(cache);
+  const [dados, setDados] = useState<Cache | null>(cache);
   useEffect(() => {
-    if (!disponivel) return;
-    ouvintes.add(setConexoes);
+    if (!n) return;
+    ouvintes.add(setDados);
     if (!cache) void atualizarConexoes();
     return () => {
-      ouvintes.delete(setConexoes);
+      ouvintes.delete(setDados);
     };
-  }, [disponivel]);
+  }, [n]);
+  const noPlano = !!n?.recursos.instagram;
+  const mc = dados?.metricool ?? null;
+  const marca = mc?.marcas.find((m) => m.perfil_id === store.marca.id);
+  const conexao = dados?.conexoes.find((c) => c.perfil_id === store.marca.id);
+  const marcaUsavel = !!marca && (marca.origem === "propria" ? mc!.propria : noPlano && mc!.plataforma);
+  const destino: { via: "metricool" | "instagram"; nome: string } | null = marcaUsavel
+    ? { via: "metricool", nome: marca!.nome ? `Metricool (${marca!.nome})` : "Metricool" }
+    : noPlano && conexao
+      ? { via: "instagram", nome: `@${conexao.username}` }
+      : null;
   return {
-    noPlano: !!n?.recursos.instagram,
+    noPlano,
+    /** Instagram direto (API da Meta) configurado na plataforma. */
     configurado: !!n?.instagramConfigurado,
-    disponivel,
-    conexao: conexoes?.find((c) => c.perfil_id === store.marca.id),
+    metricoolPlataforma: !!n?.metricoolConfigurado,
+    metricool: mc,
+    marca,
+    conexao,
+    destino,
   };
 }

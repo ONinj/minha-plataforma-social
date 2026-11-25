@@ -1,4 +1,5 @@
 import { MODO_NUVEM, contexto, responderErro, sql } from "@/lib/servidor/contexto";
+import { plataformaConfigurada } from "@/lib/servidor/metricool";
 
 export const runtime = "nodejs";
 
@@ -25,6 +26,8 @@ export async function GET(req: Request) {
       whatsapp: process.env.NEXT_PUBLIC_WHATSAPP ?? "",
       cobranca: !!process.env.ASAAS_API_KEY,
       instagramConfigurado: !!(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET && process.env.CHAVE_CRIPTO),
+      metricoolConfigurado: plataformaConfigurada(),
+      criptoConfigurada: !!process.env.CHAVE_CRIPTO,
     });
   } catch (e) {
     return responderErro(e);

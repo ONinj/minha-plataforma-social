@@ -12,8 +12,20 @@ export function supabase(): SupabaseClient {
     _sb = createClient(urlSupabase(), (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim(), {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
+    // Entrou pelo link de "Esqueci minha senha": a plataforma pede a senha nova assim que abrir.
+    _sb.auth.onAuthStateChange((evento) => {
+      if (evento === "PASSWORD_RECOVERY") {
+        veioRecuperarSenha = true;
+        eventosNuvem?.dispatchEvent(new Event("recuperar-senha"));
+      }
+    });
   }
   return _sb;
+}
+
+let veioRecuperarSenha = false;
+export function pediuNovaSenha() {
+  return veioRecuperarSenha;
 }
 
 let contaAtual: string | null = null;

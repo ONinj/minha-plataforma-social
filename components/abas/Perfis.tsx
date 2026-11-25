@@ -5,6 +5,7 @@ import { atualizarConexoes, conectarInstagram, desconectarInstagram, useInstagra
 import { useStore } from "@/lib/store";
 import { CORES, type Marca } from "@/lib/tipos";
 import Icone, { Avatar } from "../Icone";
+import { CartaoMetricool } from "../Metricool";
 
 const REDES_CONEXAO: { chave: keyof Marca["redes"]; nome: string }[] = [
   { chave: "instagram", nome: "Instagram" },
@@ -170,13 +171,15 @@ function CartaoInstagram() {
   const ig = useInstagram(store);
   const [ocupado, setOcupado] = useState(false);
   return (
-    <div className="cartao" style={{ marginBottom: 18, borderColor: ig.conexao ? "rgba(34,197,94,.4)" : undefined }}>
+    <div className="cartao" style={{ marginBottom: 18, borderColor: ig.destino ? "rgba(34,197,94,.4)" : undefined }}>
       <h3>
         <Icone nome="instagram" /> Publicação automática no Instagram
       </h3>
-      {!ig.noPlano ? (
+      {ig.metricool?.propria || ig.marca || (ig.noPlano && ig.metricoolPlataforma) ? (
+        <CartaoMetricool />
+      ) : !ig.noPlano ? (
         <div className="linha" style={{ justifyContent: "space-between" }}>
-          <span className="ajuda">🔒 Publicar sozinho no Instagram na hora marcada faz parte do plano Premium.</span>
+          <span className="ajuda">🔒 Publicar sozinho no Instagram na hora marcada faz parte do plano Premium (ou use o seu próprio Metricool em Configurações).</span>
           <span className="ajuda">Veja em Plano e créditos.</span>
         </div>
       ) : !ig.configurado ? (

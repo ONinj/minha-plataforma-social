@@ -96,11 +96,11 @@ function ItemAprovacao({ item, falarComGerente }: { item: Aprovacao; falarComGer
       atualizadoEm: agoraISO(),
     };
     store.atualizar((e) => ({ ...e, agendamentos: [...e.agendamentos, agendamento] }));
-    if (ig.conexao && publicarAuto && agendamento.midias.length) {
-      store.avisar("Preparando a publicação automática no Instagram...", "info");
+    if (ig.destino && publicarAuto && agendamento.midias.length) {
+      store.avisar("Preparando a publicação automática...", "info");
       agendarNoInstagram(store, agendamento)
-        .then(() => store.avisar(`Agendado no Instagram para ${formatarData(agendamento.data)}.`, "ok"))
-        .catch((e) => store.avisar(`Não consegui agendar no Instagram: ${e instanceof Error ? e.message : e}`, "erro"));
+        .then(() => store.avisar(`Agendado para ${formatarData(agendamento.data)} (${ig.destino!.nome}).`, "ok"))
+        .catch((e) => store.avisar(`Não consegui agendar a publicação: ${e instanceof Error ? e.message : e}`, "erro"));
     }
   }
 
@@ -182,10 +182,10 @@ function ItemAprovacao({ item, falarComGerente }: { item: Aprovacao; falarComGer
               <textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Ex.: troque a cor do fundo para azul e deixe a legenda mais curta" />
             </div>
           )}
-          {ig.conexao && !ePlanejamento && midias.length > 0 && (
+          {ig.destino && !ePlanejamento && midias.length > 0 && (
             <label className="linha" style={{ margin: 0, cursor: "pointer" }}>
               <input type="checkbox" checked={publicarAuto} onChange={(e) => setPublicarAuto(e.target.checked)} />
-              Publicar automaticamente no Instagram (@{ig.conexao.username}) na data marcada
+              Publicar automaticamente na data marcada ({ig.destino.nome})
             </label>
           )}
           <div className="linha">

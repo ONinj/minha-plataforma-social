@@ -8,7 +8,7 @@ Ferramentas:
 - **Claude, Imagens, Veo e Seedance:** uma aba para usar cada IA diretamente.
 - **Início, Ideias e textos, Perfis e redes:** resumo do dia, banco de ideias, hashtags salvas e cadastro dos perfis.
 - **Aprovações:** você aprova, pede ajuste (que volta para o gerente) ou reprova cada peça.
-- **Agendamentos:** calendário próprio com o que está *a programar*, *programado*, *postado* ou *cancelado*. Não depende do Metricool.
+- **Agendamentos:** calendário próprio com o que está *a programar*, *programado*, *postado* ou *cancelado*. Publica sozinho pelo Metricool (ou pela API da Meta) quando estiver ligado.
 - **Mídias:** biblioteca com todas as imagens e vídeos (dá para enviar os seus também).
 - **Gasto estimado do mês** em reais, no canto da tela, e confirmação antes de gerar qualquer vídeo.
 
@@ -16,7 +16,7 @@ Ferramentas:
 
 - **Modo local** (padrão): cada pessoa cadastra as próprias chaves em Configurações e os dados ficam no navegador.
 - **Modo nuvem**: login, planos com créditos, cobrança pelo Asaas, dados na nuvem e painel de administração.
-  Liga sozinho quando as variáveis do Supabase estão na Vercel. Passo a passo em [docs/CONFIGURAR-NUVEM.md](docs/CONFIGURAR-NUVEM.md). Publicação automática no Instagram: [docs/CONFIGURAR-INSTAGRAM.md](docs/CONFIGURAR-INSTAGRAM.md).
+  Liga sozinho quando as variáveis do Supabase estão na Vercel. Passo a passo em [docs/CONFIGURAR-NUVEM.md](docs/CONFIGURAR-NUVEM.md). Login (senha, link e Google): [docs/CONFIGURAR-LOGIN.md](docs/CONFIGURAR-LOGIN.md). Publicação automática: pelo Metricool em [docs/CONFIGURAR-METRICOOL.md](docs/CONFIGURAR-METRICOOL.md) ou direto pela Meta em [docs/CONFIGURAR-INSTAGRAM.md](docs/CONFIGURAR-INSTAGRAM.md).
 
 ## Como usar (modo local)
 

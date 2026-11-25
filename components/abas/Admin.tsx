@@ -6,6 +6,7 @@ import { api } from "@/lib/nuvem";
 import { useStore } from "@/lib/store";
 import { brl, formatarData } from "@/lib/util";
 import Icone from "../Icone";
+import { AdminMetricool } from "../Metricool";
 
 type ContaAdmin = {
   id: string;
@@ -192,6 +193,7 @@ function ModalConta({
           Para o plano Empresa: escolha &quot;Empresa&quot;, status &quot;ativo&quot;, informe os créditos e o valor combinados e
           coloque os créditos do primeiro mês no ajuste. A cobrança do Empresa você faz por fora (ou pelo Asaas manualmente).
         </p>
+        {store.nuvem?.metricoolConfigurado && <AdminMetricool conta={conta.id} />}
         <div className="linha" style={{ justifyContent: "flex-end" }}>
           <button className="botao sec" onClick={aoFechar}>Cancelar</button>
           <button className="botao" onClick={salvarPlano}>Salvar</button>

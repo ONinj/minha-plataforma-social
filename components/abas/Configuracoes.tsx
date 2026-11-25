@@ -6,6 +6,7 @@ import { useStore } from "@/lib/store";
 import type { Configuracoes as Config } from "@/lib/tipos";
 import { MODO_NUVEM } from "@/lib/nuvem";
 import Icone from "../Icone";
+import { MetricoolProprio } from "../Metricool";
 
 export default function Configuracoes() {
   const store = useStore();
@@ -165,6 +166,8 @@ export default function Configuracoes() {
             : "O orçamento avisa quando você chega a 80% e a 100% do mês. Os preços são estimativas: confira os valores reais nos painéis da Anthropic e do fal.ai."}
         </p>
       </div>
+
+      {MODO_NUVEM && <MetricoolProprio />}
 
       <div className="cartao">
         <h3>

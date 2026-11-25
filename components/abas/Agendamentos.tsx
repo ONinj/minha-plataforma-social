@@ -219,8 +219,8 @@ function ModalAgendamento({ item, aoFechar }: { item: Agendamento | null; aoFech
     if (item?.publicarAuto && item.publicacao?.status !== "publicada" && item.publicacao?.status !== "cancelada") {
       const novo = { ...item, ...dados };
       agendarNoInstagram(store, novo)
-        .then(() => store.avisar("Publicação no Instagram atualizada.", "ok"))
-        .catch((e) => store.avisar(`Instagram: ${e instanceof Error ? e.message : e}`, "erro"));
+        .then(() => store.avisar("Publicação automática atualizada.", "ok"))
+        .catch((e) => store.avisar(`Publicação automática: ${e instanceof Error ? e.message : e}`, "erro"));
     }
   }
 
@@ -360,7 +360,7 @@ function PainelInstagram({ item, aoFechar }: { item: Agendamento; aoFechar: () =
       store.avisar(ok, "ok");
       aoFechar();
     } catch (e) {
-      store.avisar(`Instagram: ${e instanceof Error ? e.message : e}`, "erro");
+      store.avisar(`Publicação automática: ${e instanceof Error ? e.message : e}`, "erro");
     } finally {
       setTrabalhando(false);
     }
@@ -374,30 +374,32 @@ function PainelInstagram({ item, aoFechar }: { item: Agendamento; aoFechar: () =
         </b>
         <SeloInstagram a={item} />
       </div>
-      {!ig.noPlano ? (
-        <p className="ajuda" style={{ marginBottom: 0 }}>🔒 Publicação automática a partir do plano Premium.</p>
-      ) : !ig.conexao ? (
-        <p className="ajuda" style={{ marginBottom: 0 }}>Conecte o Instagram deste perfil em Perfis e redes para publicar sozinho.</p>
-      ) : p?.status === "publicada" ? (
+      {p?.status === "publicada" ? (
         <p className="ajuda" style={{ marginBottom: 0 }}>
-          Publicado em @{ig.conexao.username}.{" "}
+          Publicado{ig.destino ? ` (${ig.destino.nome})` : ""}.{" "}
           {p.permalink && (
             <a href={p.permalink} target="_blank" rel="noreferrer">
-              Ver no Instagram
+              Ver a publicação
             </a>
           )}
+        </p>
+      ) : !ig.destino ? (
+        <p className="ajuda" style={{ marginBottom: 0 }}>
+          {ig.noPlano || ig.metricool?.propria
+            ? "Este perfil ainda não está pronto para publicar sozinho (veja Perfis e redes)."
+            : "🔒 Publicação automática a partir do plano Premium (ou com o seu próprio Metricool, em Configurações)."}
         </p>
       ) : (
         <>
           {p?.status === "erro" && <div className="erro-msg">{p.erro}</div>}
           <p className="ajuda">
             {ativo
-              ? `Vai sair sozinho em @${ig.conexao.username} na data e hora marcadas.`
-              : `Publique sozinho em @${ig.conexao.username} na data marcada (as imagens viram JPEG automaticamente).`}
+              ? `Vai sair sozinho na data e hora marcadas (${ig.destino.nome}).`
+              : `Publique sozinho na data marcada (${ig.destino.nome}). As imagens viram JPEG automaticamente.`}
           </p>
           <div className="linha" style={{ gap: 8 }}>
             {!ativo || p?.status === "erro" ? (
-              <button className="botao peq" disabled={trabalhando || !item.midias.length} onClick={() => fazer(() => agendarNoInstagram(store, item), "Agendado no Instagram.")}>
+              <button className="botao peq" disabled={trabalhando || !item.midias.length} onClick={() => fazer(() => agendarNoInstagram(store, item), "Publicação automática agendada.")}>
                 {trabalhando ? "Preparando..." : p?.status === "erro" ? "Tentar de novo" : "Publicar automaticamente na data"}
               </button>
             ) : (
@@ -409,7 +411,7 @@ function PainelInstagram({ item, aoFechar }: { item: Agendamento; aoFechar: () =
               className="botao sec peq"
               disabled={trabalhando || !item.midias.length}
               onClick={() => {
-                if (window.confirm(`Publicar agora em @${ig.conexao!.username}?`)) fazer(() => agendarNoInstagram(store, item, { agora: true }), "Enviado para o Instagram.");
+                if (window.confirm(`Publicar agora (${ig.destino!.nome})?`)) fazer(() => agendarNoInstagram(store, item, { agora: true }), ig.destino!.via === "metricool" ? "Enviado ao Metricool: sai em cerca de 2 minutos." : "Enviado para o Instagram.");
               }}
             >
               Publicar agora

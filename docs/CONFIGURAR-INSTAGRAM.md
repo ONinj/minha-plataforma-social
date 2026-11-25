@@ -4,6 +4,7 @@ Pré-requisito: o modo nuvem já funcionando (docs/CONFIGURAR-NUVEM.md).
 
 ## 1. Banco de dados (2 min)
 Supabase → **SQL Editor → New query** → cole o arquivo `supabase/migrations/002_instagram.sql` → **Run**.
+Depois faça o mesmo com `supabase/migrations/003_metricool.sql`.
 
 ## 2. App na Meta (20 min)
 1. Entre em **developers.facebook.com** com o seu Facebook → **My Apps → Create App**.

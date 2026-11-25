@@ -5,11 +5,11 @@ import { verificarVideos } from "@/lib/servicos";
 import { StoreProvider, totalContaMes, totalMes, useStore } from "@/lib/store";
 import { formatarCreditos } from "@/lib/custo";
 import { atualizarConexoes, sincronizarPublicacoes } from "@/lib/instagram";
-import { MODO_NUVEM } from "@/lib/nuvem";
+import { MODO_NUVEM, eventosNuvem, pediuNovaSenha } from "@/lib/nuvem";
 import { brl } from "@/lib/util";
 import Admin from "./abas/Admin";
 import Plano from "./abas/Plano";
-import Login from "./Login";
+import Login, { NovaSenha } from "./Login";
 import Agendamentos from "./abas/Agendamentos";
 import Aprovacoes from "./abas/Aprovacoes";
 import Biblioteca from "./abas/Biblioteca";
@@ -605,12 +605,23 @@ function Avisos() {
   );
 }
 
+// Voltou pelo link de "Esqueci minha senha"? (lido antes de a URL ser limpa)
+const PEDIU_NOVA_SENHA = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("nova-senha");
+
 function MenuUsuario({ ir }: { ir: (a: IdAba) => void }) {
   const { nuvem, sair } = useStore();
   const [aberto, setAberto] = useState(false);
+  const [senha, setSenha] = useState<"" | "trocar" | "recuperacao">(PEDIU_NOVA_SENHA || pediuNovaSenha() ? "recuperacao" : "");
+  useEffect(() => {
+    if (PEDIU_NOVA_SENHA) window.history.replaceState(null, "", window.location.pathname);
+    const aoRecuperar = () => setSenha("recuperacao");
+    eventosNuvem?.addEventListener("recuperar-senha", aoRecuperar);
+    return () => eventosNuvem?.removeEventListener("recuperar-senha", aoRecuperar);
+  }, []);
   if (!nuvem) return null;
   return (
     <div style={{ position: "relative" }}>
+      {senha && <NovaSenha recuperacao={senha === "recuperacao"} aoFechar={() => setSenha("")} />}
       <button className="botao-icone" style={{ padding: 0, border: 0, background: "none" }} onClick={() => setAberto((v) => !v)} aria-label="Sua conta">
         <Avatar nome={nuvem.usuario.email} cor="#6366f1" tamanho={34} />
       </button>
@@ -624,6 +635,9 @@ function MenuUsuario({ ir }: { ir: (a: IdAba) => void }) {
           </div>
           <button className="menu-item" onClick={() => { ir("plano"); setAberto(false); }}>
             <Icone nome="carteira" /> Plano e créditos
+          </button>
+          <button className="menu-item" onClick={() => { setSenha("trocar"); setAberto(false); }}>
+            <Icone nome="cadeado" /> Definir ou trocar senha
           </button>
           <button className="menu-item" onClick={() => sair()}>
             <Icone nome="sair" /> Sair

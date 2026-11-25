@@ -174,8 +174,8 @@ export async function processarFila(limite = 8) {
   const fila = (await db`update publicacoes set status = 'publicando', tentativas = tentativas + 1, atualizado_em = now()
     where id in (
       select id from publicacoes
-      where (status = 'agendada' and quando <= now())
-         or (status = 'publicando' and atualizado_em < now() - interval '2 minutes')
+      where via = 'instagram' and ((status = 'agendada' and quando <= now())
+         or (status = 'publicando' and atualizado_em < now() - interval '2 minutes'))
       order by quando limit ${limite} for update skip locked)
     returning id, perfil_id, tipo, legenda, midias, containers, tentativas`) as unknown as Publicacao[];
   const resultado: Record<string, string> = {};

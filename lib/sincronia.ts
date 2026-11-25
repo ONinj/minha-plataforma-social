@@ -45,6 +45,8 @@ export type InfoNuvem = {
   whatsapp: string;
   cobranca: boolean;
   instagramConfigurado: boolean;
+  metricoolConfigurado?: boolean;
+  criptoConfigurada?: boolean;
 };
 
 const PREFS: (keyof Configuracoes)[] = [
