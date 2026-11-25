@@ -25,6 +25,15 @@ export async function GET() {
   r.endereco_supabase = urlSupabase() || "FALTANDO";
 
   const db = process.env.DATABASE_URL?.trim() ?? "";
+  // Mostra o formato do endereço com a senha escondida, para conferir.
+  const m = db.match(/^(\w+):\/\/([^:/@]*)(?::(.*))?@([^@]*)$/);
+  r.banco_formato = !db
+    ? "FALTANDO"
+    : m
+      ? `${m[1]}://${m[2]}:${m[3] ? "*".repeat(Math.min(m[3].length, 12)) : "(sem senha)"}@${m[4]}`
+      : `formato não reconhecido; começa com "${db.slice(0, 14)}…"`;
+  if (m?.[3] && /[@/:#?\s]/.test(m[3])) r.banco_senha = "a senha tem símbolos que quebram o endereço (@ / : # ? ou espaço): gere outra só com letras e números";
+  if (/https?:\/\//.test(db)) r.banco_aviso = "o endereço contém 'https://': parece que foi colado o Project URL no meio. Use só o endereço postgresql:// do Transaction pooler";
   r.banco_endereco = !db
     ? "FALTANDO"
     : db.includes("[YOUR-PASSWORD]")
