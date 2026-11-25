@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { MensagemClaude } from "@/lib/tipos";
 import Markdown from "./Markdown";
+import Icone from "./Icone";
 import { MidiaPorId } from "./MidiaView";
-import SeletorMidias from "./SeletorMidias";
+import SeletorMidias, { useUpload } from "./SeletorMidias";
 
 const NOMES_FERRAMENTAS: Record<string, string> = {
   gerar_imagem: "Pediu uma imagem (Nano Banana)",
@@ -121,7 +122,16 @@ export default function ChatClaudeView({
   const [texto, setTexto] = useState("");
   const [anexos, setAnexos] = useState<string[]>([]);
   const [seletor, setSeletor] = useState(false);
+  const [arrastando, setArrastando] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
+  const upload = useUpload();
+
+  // Colar (Ctrl+V) ou arrastar fotos/vídeos direto no chat.
+  async function anexarArquivos(arquivos: FileList | null) {
+    if (!permitirAnexos || !arquivos?.length) return;
+    const novas = await upload(arquivos);
+    if (novas.length) setAnexos((a) => [...new Set([...a, ...novas.map((m) => m.id)])]);
+  }
 
   useEffect(() => {
     fim.current?.scrollIntoView({ behavior: "smooth" });
@@ -140,7 +150,23 @@ export default function ChatClaudeView({
   }
 
   return (
-    <div className="chat">
+    <div
+      className={`chat ${arrastando ? "arrastando" : ""}`}
+      onDragOver={(e) => {
+        if (!permitirAnexos || !e.dataTransfer.types.includes("Files")) return;
+        e.preventDefault();
+        setArrastando(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget === e.target) setArrastando(false);
+      }}
+      onDrop={(e) => {
+        if (!permitirAnexos) return;
+        e.preventDefault();
+        setArrastando(false);
+        anexarArquivos(e.dataTransfer.files);
+      }}
+    >
       <div className="mensagens">
         {mensagens.length === 0 && boasVindas}
         {mensagens.map((m, i) => (
@@ -166,14 +192,20 @@ export default function ChatClaudeView({
       )}
       <div className="entrada">
         {permitirAnexos && (
-          <button className="botao sec" onClick={() => setSeletor(true)} title="Anexar fotos ou vídeos" disabled={ocupado}>
-            📎
+          <button className="botao-icone" onClick={() => setSeletor(true)} title="Anexar fotos ou vídeos (ou cole/arraste aqui)" disabled={ocupado}>
+            <Icone nome="clipe" />
           </button>
         )}
         <textarea
           value={texto}
           placeholder={placeholder}
           onChange={(e) => setTexto(e.target.value)}
+          onPaste={(e) => {
+            if (permitirAnexos && e.clipboardData.files.length) {
+              e.preventDefault();
+              anexarArquivos(e.clipboardData.files);
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -181,8 +213,8 @@ export default function ChatClaudeView({
             }
           }}
         />
-        <button className="botao" onClick={enviar} disabled={ocupado || (!texto.trim() && !anexos.length)}>
-          Enviar
+        <button className="botao" onClick={enviar} disabled={ocupado || (!texto.trim() && !anexos.length)} aria-label="Enviar">
+          <Icone nome="enviar" tamanho={16} />
         </button>
       </div>
       {seletor && (

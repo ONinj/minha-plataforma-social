@@ -26,7 +26,6 @@ async function getJSON<T>(url: string, headers: Record<string, string>): Promise
 }
 
 const hAnthropic = (c: Configuracoes) => ({ "x-anthropic-key": c.chaveAnthropic });
-const hGoogle = (c: Configuracoes) => ({ "x-gemini-key": c.chaveGoogle });
 const hFal = (c: Configuracoes) => ({ "x-fal-key": c.chaveFal });
 
 // ---------------- Claude ----------------
@@ -59,33 +58,11 @@ function custoClaude(r: Anthropic.Beta.BetaMessage): number {
   return (tokensEntrada * entrada + (u.output_tokens ?? 0) * saida) / 1_000_000;
 }
 
-// ---------------- Gemini ----------------
+// ---------------- Imagens (Nano Banana pelo fal.ai) ----------------
 
-type ParteAPI = { text?: string; inlineData?: { mimeType: string; data: string }; thought?: boolean };
-type RespostaGemini = {
-  candidates?: { content?: { parts?: ParteAPI[] }; finishReason?: string }[];
-  promptFeedback?: { blockReason?: string };
-};
+type ParteAPI = { text?: string; inlineData?: { mimeType: string; data: string } };
 
-export async function chamarGemini(
-  store: Store,
-  params: { model: string; contents: unknown; generationConfig?: unknown; systemInstruction?: unknown },
-): Promise<ParteAPI[]> {
-  const config = store.obter().config;
-  if (!config.chaveGoogle) throw new Error("Cadastre a chave do Google em Configurações.");
-  const r = await postJSON<RespostaGemini>("/api/gemini/generate", params, hGoogle(config));
-  if (r.promptFeedback?.blockReason) throw new Error(`O Gemini bloqueou o pedido: ${r.promptFeedback.blockReason}`);
-  return (r.candidates?.[0]?.content?.parts ?? []).filter((p) => !p.thought);
-}
-
-export async function listarModelosGoogle(config: Configuracoes) {
-  return getJSON<{ modelos: { id: string; nome: string; metodos: string[] }[] }>(
-    "/api/gemini/models",
-    hGoogle(config),
-  );
-}
-
-/** Converte uma mídia salva em parte inlineData (reduzida) para mandar ao Gemini. */
+/** Lê uma imagem salva, reduzida, em base64 (para mandar às IAs). */
 export async function midiaParaInline(store: Store, id: string, ladoMax = 1536) {
   const blob = await store.lerBlob(id);
   if (!blob) throw new Error(`Mídia ${id} não encontrada.`);
@@ -93,7 +70,7 @@ export async function midiaParaInline(store: Store, id: string, ladoMax = 1536) 
   return { inlineData: { mimeType: "image/jpeg", data: await blobParaBase64(reduzida) } };
 }
 
-/** Salva as imagens devolvidas pelo Gemini na biblioteca e devolve as mídias criadas. */
+/** Salva as imagens geradas na biblioteca e devolve as mídias criadas. */
 export async function salvarImagensGemini(
   store: Store,
   partes: ParteAPI[],
@@ -146,30 +123,7 @@ export async function gerarImagemFal(
   return { midias, texto: r.texto };
 }
 
-export async function gerarImagem(
-  store: Store,
-  params: { prompt: string; proporcao?: string; referencias?: string[]; titulo: string },
-): Promise<{ midias: Midia[]; texto: string }> {
-  const config = store.obter().config;
-  if (config.provedorImagem === "fal") return gerarImagemFal(store, params);
-
-  const partes: unknown[] = [];
-  for (const ref of params.referencias ?? []) partes.push(await midiaParaInline(store, ref));
-  partes.push({ text: params.prompt });
-
-  const resposta = await chamarGemini(store, {
-    model: config.modeloGeminiImagem,
-    contents: [{ role: "user", parts: partes }],
-    generationConfig: {
-      responseModalities: ["TEXT", "IMAGE"],
-      ...(params.proporcao ? { imageConfig: { aspectRatio: params.proporcao } } : {}),
-    },
-  });
-  const midias = await salvarImagensGemini(store, resposta, { titulo: params.titulo, prompt: params.prompt });
-  const texto = resposta.map((p) => p.text ?? "").join("").trim();
-  if (!midias.length) throw new Error(texto || "O Gemini não devolveu nenhuma imagem.");
-  return { midias, texto };
-}
+export const gerarImagem = gerarImagemFal;
 
 // ---------------- Vídeo (Veo e Seedance) ----------------
 
@@ -198,24 +152,15 @@ export async function iniciarVideo(
   }
 
   let job: Midia["job"];
-  if (params.provedor === "veo" && config.provedorVeo === "fal") {
-    if (!config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
+  if (!config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
+  if (params.provedor === "veo") {
     const r = await postJSON<{ endpoint: string; requestId: string }>(
       "/api/fal/video-start",
       { familia: "veo", modelo: config.modeloVeoFal, prompt: params.prompt, imagem, proporcao: params.proporcao },
       hFal(config),
     );
     job = { provedor: "fal", endpoint: r.endpoint, requestId: r.requestId };
-  } else if (params.provedor === "veo") {
-    if (!config.chaveGoogle) throw new Error("Cadastre a chave do Google em Configurações.");
-    const r = await postJSON<{ operacao: string }>(
-      "/api/veo/start",
-      { model: config.modeloVeo, prompt: params.prompt, aspectRatio: params.proporcao, imagem },
-      hGoogle(config),
-    );
-    job = { provedor: "veo", operacao: r.operacao };
   } else {
-    if (!config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
     const r = await postJSON<{ endpoint: string; requestId: string }>(
       "/api/fal/video-start",
       {
@@ -247,50 +192,34 @@ export async function iniciarVideo(
   return midia;
 }
 
-/** Consulta os vídeos em produção e baixa os que ficaram prontos. */
+/** Consulta os vídeos em produção (de todos os perfis da conta) e baixa os que ficaram prontos. */
 export async function verificarVideos(store: Store) {
-  const { midias, config } = store.obter();
-  for (const m of midias.filter((x) => x.status === "gerando" && x.job)) {
+  const { config } = store.obter();
+  for (const m of store.midiasGerando()) {
+    if (!m.job) continue;
     try {
-      if (m.job!.provedor === "veo") {
-        const q = new URLSearchParams({ operacao: m.job!.operacao });
-        const r = await getJSON<{ pronto: boolean; uri?: string; erro?: string }>(
-          `/api/veo/status?${q}`,
-          hGoogle(config),
-        );
-        if (!r.pronto) continue;
-        if (r.erro || !r.uri) {
-          store.atualizarMidia(m.id, { status: "erro", erro: r.erro });
-          continue;
-        }
-        const resp = await fetch(`/api/veo/download?${new URLSearchParams({ uri: r.uri })}`, {
-          headers: hGoogle(config),
-        });
-        if (!resp.ok) throw new Error("Falha ao baixar o vídeo do Veo.");
-        const blob = await resp.blob();
-        await store.salvarBlob(m.id, blob);
-        store.atualizarMidia(m.id, { status: "pronto", mime: blob.type || "video/mp4" });
-      } else {
-        const job = m.job as { endpoint: string; requestId: string };
-        const q = new URLSearchParams({ endpoint: job.endpoint, requestId: job.requestId });
-        const r = await getJSON<{ pronto: boolean; url?: string; erro?: string }>(
-          `/api/fal/video-status?${q}`,
-          hFal(config),
-        );
-        if (!r.pronto) continue;
-        if (r.erro || !r.url) {
-          store.atualizarMidia(m.id, { status: "erro", erro: r.erro });
-          continue;
-        }
-        try {
-          const blob = await (await fetch(r.url)).blob();
-          await store.salvarBlob(m.id, blob);
-          store.atualizarMidia(m.id, { status: "pronto", mime: blob.type || "video/mp4", urlExterna: r.url });
-        } catch {
-          // Se o navegador não conseguir baixar, guarda o link do fal.ai.
-          store.atualizarMidia(m.id, { status: "pronto", mime: "video/mp4", urlExterna: r.url });
-        }
+      if (m.job.provedor === "veo") {
+        // Vídeo antigo, do Google direto (não usado mais).
+        store.atualizarMidia(m.id, { status: "erro", erro: "Vídeo do Google direto, que não é mais usado." });
+        continue;
       }
+      const q = new URLSearchParams({ endpoint: m.job.endpoint, requestId: m.job.requestId });
+      const r = await getJSON<{ pronto: boolean; url?: string; erro?: string }>(`/api/fal/video-status?${q}`, hFal(config));
+      if (!r.pronto) continue;
+      if (r.erro || !r.url) {
+        store.atualizarMidia(m.id, { status: "erro", erro: r.erro });
+        store.avisar(`O vídeo "${m.titulo}" falhou.`, "erro");
+        continue;
+      }
+      try {
+        const blob = await (await fetch(r.url)).blob();
+        await store.salvarBlob(m.id, blob);
+        store.atualizarMidia(m.id, { status: "pronto", mime: blob.type || "video/mp4", urlExterna: r.url });
+      } catch {
+        // Se o navegador não conseguir baixar, guarda o link do fal.ai.
+        store.atualizarMidia(m.id, { status: "pronto", mime: "video/mp4", urlExterna: r.url });
+      }
+      store.avisar(`Vídeo pronto: "${m.titulo}"`, "ok");
     } catch (e) {
       console.warn("Falha ao verificar vídeo", m.id, e);
     }

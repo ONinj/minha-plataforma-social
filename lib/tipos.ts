@@ -7,6 +7,7 @@ export type Midia = {
   tipo: "imagem" | "video";
   titulo: string;
   prompt?: string;
+  /** "gemini" = imagem gerada por IA (Nano Banana). Nome mantido por compatibilidade. */
   origem: "gemini" | "veo" | "seedance" | "upload";
   status: "pronto" | "gerando" | "erro";
   erro?: string;
@@ -18,6 +19,7 @@ export type Midia = {
     | { provedor: "seedance" | "fal"; endpoint: string; requestId: string };
   /** Imagem de IA liberada pelo usuário para servir de referência ao gerente. */
   referenciaAprovada?: boolean;
+  favorita?: boolean;
   /** Link externo, se o arquivo não pôde ser salvo localmente. */
   urlExterna?: string;
 };
@@ -59,24 +61,22 @@ export type Agendamento = {
 export type ParteGemini = { texto: string } | { midiaId: string };
 export type MensagemGemini = { papel: "user" | "model"; partes: ParteGemini[] };
 
+export type Ideia = { id: string; texto: string; feita: boolean; criadoEm: string };
+export type TextoSalvo = { id: string; titulo: string; texto: string; tipo: "hashtags" | "legenda" | "cta" | "outro" };
+
+/** Configurações da conta (chaves, modelos, preços). Valem para todos os perfis da conta. */
 export type Configuracoes = {
   chaveAnthropic: string;
-  chaveGoogle: string;
   chaveFal: string;
   modeloClaude: string;
   esforcoGerente: "low" | "medium" | "high" | "xhigh" | "max";
-  /** De onde saem as imagens e os vídeos do Veo: fal.ai ou Google direto. */
-  provedorImagem: "fal" | "google";
   modeloImagemFal: string;
-  provedorVeo: "fal" | "google";
   modeloVeoFal: string;
-  modeloGeminiTexto: string;
-  modeloGeminiImagem: string;
-  modeloVeo: string;
   prefixoSeedance: string;
   resolucaoSeedance: string;
   confirmarVideos: boolean;
-  perfilMarca: string;
+  /** Teto de gasto mensal da conta, em reais (0 = sem teto). */
+  orcamentoMensal: number;
   // Preços em dólar para a estimativa de gastos
   cambio: number;
   precoImagem: number;
@@ -86,55 +86,78 @@ export type Configuracoes = {
   segundosSeedance: number;
 };
 
-export type Gastos = Record<string, { claude: number; gemini: number; veo: number; seedance: number }>;
+export type CategoriaGasto = "claude" | "gemini" | "veo" | "seedance";
+export type Gastos = Record<string, Record<CategoriaGasto, number>>;
 
-export type Estado = {
-  config: Configuracoes;
+/** Um perfil de rede social (uma marca / cliente) dentro de uma conta. */
+export type Marca = {
+  id: string;
+  nome: string;
+  arroba: string;
+  cor: string;
+  /** Texto do perfil da marca (nicho, público, tom de voz...) usado pelo gerente. */
+  perfil: string;
+  redes: { instagram?: string; tiktok?: string; facebook?: string; youtube?: string };
+  criadoEm: string;
   midias: Midia[];
   aprovacoes: Aprovacao[];
   agendamentos: Agendamento[];
   chatGerente: MensagemClaude[];
   chatClaude: MensagemClaude[];
   chatGemini: MensagemGemini[];
+  ideias: Ideia[];
+  textos: TextoSalvo[];
+  gastos: Gastos;
+};
+
+/** Conta principal (a pessoa / social media), com as próprias chaves e vários perfis. */
+export type Conta = {
+  id: string;
+  nome: string;
+  email: string;
+  cor: string;
+  config: Configuracoes;
+  marcas: Marca[];
+  marcaAtiva: string;
+};
+
+export type Raiz = { versao: 2; contas: Conta[]; contaAtiva: string };
+
+/** Visão usada pelas telas: o perfil ativo + as configurações da conta ativa. */
+export type Estado = {
+  config: Configuracoes & { perfilMarca: string };
+  midias: Midia[];
+  aprovacoes: Aprovacao[];
+  agendamentos: Agendamento[];
+  chatGerente: MensagemClaude[];
+  chatClaude: MensagemClaude[];
+  chatGemini: MensagemGemini[];
+  ideias: Ideia[];
+  textos: TextoSalvo[];
   gastos: Gastos;
 };
 
 export const REDES = ["Instagram", "TikTok", "Facebook", "YouTube", "Pinterest", "Threads"];
 
+export const CORES = ["#8b5cf6", "#06b6d4", "#f43f5e", "#f59e0b", "#10b981", "#3b82f6", "#ec4899", "#84cc16"];
+
 export const CONFIG_PADRAO: Configuracoes = {
   chaveAnthropic: "",
-  chaveGoogle: "",
   chaveFal: "",
   modeloClaude: "claude-opus-5-5",
   esforcoGerente: "medium",
-  provedorImagem: "fal",
   modeloImagemFal: "fal-ai/nano-banana-2",
-  provedorVeo: "fal",
   modeloVeoFal: "fal-ai/veo3.1/fast",
-  modeloGeminiTexto: "gemini-flash-latest",
-  modeloGeminiImagem: "gemini-nano-banana-2.1",
-  modeloVeo: "veo-3.1-fast-generate-preview",
   prefixoSeedance: "bytedance/seedance-2.5",
   resolucaoSeedance: "720p",
   confirmarVideos: true,
-  perfilMarca: "",
+  orcamentoMensal: 0,
   cambio: 5.3,
   precoImagem: 0.08,
   precoVeoSegundo: 0.15,
   segundosVeo: 8,
   precoSeedanceSegundo: 0.47,
   segundosSeedance: 5,
-};
-
-export const ESTADO_INICIAL: Estado = {
-  config: CONFIG_PADRAO,
-  midias: [],
-  aprovacoes: [],
-  agendamentos: [],
-  chatGerente: [],
-  chatClaude: [],
-  chatGemini: [],
-  gastos: {},
 };
 
 /** Preço em dólar por milhão de tokens (entrada, saída). */

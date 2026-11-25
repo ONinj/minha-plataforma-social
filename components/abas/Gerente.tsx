@@ -5,12 +5,14 @@ import { rodarGerente } from "@/lib/gerente";
 import { useStore } from "@/lib/store";
 import type { Midia } from "@/lib/tipos";
 import ChatClaudeView from "../ChatClaudeView";
+import Icone from "../Icone";
 import { CartaoMidia } from "../MidiaView";
 
 const SUGESTOES = [
-  "Monte o planejamento de dezembro para o meu Instagram: 3 posts por semana e stories diários.",
-  "Crie 3 cards de feed sobre dicas do meu nicho, com a mesma identidade visual.",
-  "Faça um reels de 8 segundos apresentando meu perfil, com uma imagem de referência antes.",
+  "Monte o planejamento do próximo mês: 3 posts por semana e stories diários.",
+  "Crie 3 cards de feed com dicas do nicho, com a mesma identidade visual.",
+  "Faça um reels de 8 segundos apresentando o perfil, com uma imagem de referência antes.",
+  "Escreva 5 legendas para posts desta semana, com chamadas diferentes.",
 ];
 
 type PedidoReferencia = { midias: Midia[]; motivo: string; responder: (ok: boolean) => void };
@@ -50,6 +52,7 @@ export default function Gerente({
   async function enviar(texto: string, anexos: string[]) {
     setErro(undefined);
     setOcupado(true);
+    store.definirOcupado(true);
     try {
       const fim = await rodarGerente(
         store,
@@ -78,6 +81,7 @@ export default function Gerente({
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
       setOcupado(false);
+      store.definirOcupado(false);
       setEtapa(undefined);
     }
   }
@@ -94,20 +98,21 @@ export default function Gerente({
         placeholder="Dê a ideia, peça o planejamento ou anexe fotos/vídeos com 📎 (Enter envia)"
         aoEnviar={enviar}
         boasVindas={
-          <div className="cartao" style={{ maxWidth: 720 }}>
-            <h3>Central: fale com o gerente</h3>
+          <div className="boas-vindas">
+            <div className="orb">
+              <Icone nome="central" tamanho={30} />
+            </div>
+            <h2 className="titulo-pagina">
+              O que vamos criar para <span className="gradiente-texto">{store.marca.nome}</span>?
+            </h2>
             <p className="ajuda">
-              Aqui você conversa só com o Claude. Ele planeja, escreve os prompts, manda criar as imagens e os vídeos,
-              revisa tudo e coloca na aba <b>Aprovações</b>. Você só aprova.
+              Fale com o gerente. Ele planeja, escreve os prompts, cria as imagens (Nano Banana 2) e os vídeos (Veo e
+              Seedance), revisa tudo e coloca em <b>Aprovações</b>. Anexe, cole ou arraste fotos e vídeos reais, como a
+              foto de um produto para animar.
             </p>
-            <p className="ajuda">
-              Use o <b>📎</b> para mandar fotos e vídeos reais (ex.: foto de um produto) e pedir para animar ou publicar.
-              Antes de usar uma imagem feita por IA como referência, ele pede a sua aprovação.
-            </p>
-            <p className="ajuda">Experimente:</p>
-            <div className="lista" style={{ gap: 8 }}>
+            <div className="sugestoes">
               {SUGESTOES.map((s) => (
-                <button key={s} className="botao sec" style={{ textAlign: "left" }} onClick={() => enviar(s, [])}>
+                <button key={s} className="sugestao" onClick={() => enviar(s, [])}>
                   {s}
                 </button>
               ))}

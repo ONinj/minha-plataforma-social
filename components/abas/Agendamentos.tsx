@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { REDES, type Agendamento, type StatusAgendamento, type TipoConteudo } from "@/lib/tipos";
 import { agoraISO, formatarData, novoId } from "@/lib/util";
+import Icone from "../Icone";
 import { BotaoBaixar, CartaoMidia } from "../MidiaView";
 
 export const NOMES_STATUS_AGD: Record<StatusAgendamento, string> = {
@@ -20,7 +21,8 @@ function chaveDia(d: Date) {
 }
 
 export default function Agendamentos() {
-  const { estado } = useStore();
+  const store = useStore();
+  const { estado } = store;
   const [mes, setMes] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -55,12 +57,36 @@ export default function Agendamentos() {
   const contagem = (s: StatusAgendamento) => doMes.filter((a) => a.status === s).length;
   const lista = doMes.filter((a) => filtro === "todos" || a.status === filtro);
 
+  function mudarStatus(id: string, status: StatusAgendamento) {
+    store.atualizar((e) => ({
+      ...e,
+      agendamentos: e.agendamentos.map((x) => (x.id === id ? { ...x, status, atualizadoEm: agoraISO() } : x)),
+    }));
+    store.avisar(`Marcado como ${NOMES_STATUS_AGD[status].toLowerCase()}.`, "ok");
+  }
+
+  async function copiar(a: Agendamento) {
+    await navigator.clipboard.writeText([a.legenda, a.hashtags].filter(Boolean).join("\n\n"));
+    store.avisar("Legenda copiada.", "ok");
+  }
+
+  function duplicar(a: Agendamento) {
+    const d = new Date(a.data);
+    d.setDate(d.getDate() + 7);
+    const data = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}T${a.data.slice(11, 16)}`;
+    store.atualizar((e) => ({
+      ...e,
+      agendamentos: [...e.agendamentos, { ...a, id: novoId("agd"), aprovacaoId: undefined, data, status: "a_programar", criadoEm: agoraISO(), atualizadoEm: agoraISO() }],
+    }));
+    store.avisar("Duplicado para a semana seguinte.", "ok");
+  }
+
   return (
     <div className="conteudo">
       <div className="linha" style={{ justifyContent: "space-between", marginBottom: 16 }}>
         <div className="linha">
-          <button className="botao sec peq" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>
-            ←
+          <button className="botao-icone" aria-label="Mês anterior" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() - 1, 1))}>
+            <Icone nome="setaEsq" />
           </button>
           <h2 style={{ margin: 0, fontSize: 18, minWidth: 170, textAlign: "center" }}>
             {(() => {
@@ -68,12 +94,12 @@ export default function Agendamentos() {
               return t.charAt(0).toUpperCase() + t.slice(1);
             })()}
           </h2>
-          <button className="botao sec peq" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>
-            →
+          <button className="botao-icone" aria-label="Próximo mês" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth() + 1, 1))}>
+            <Icone nome="setaDir" />
           </button>
         </div>
         <button className="botao" onClick={() => setAberto("novo")}>
-          + Agendamento manual
+          <Icone nome="mais" /> Agendamento manual
         </button>
       </div>
 
@@ -119,15 +145,33 @@ export default function Agendamentos() {
       ) : (
         <div className="lista">
           {lista.map((a) => (
-            <button key={a.id} className="cartao" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setAberto(a)}>
-              <div className="linha" style={{ justifyContent: "space-between" }}>
+            <div key={a.id} className="cartao" style={{ padding: 14 }}>
+              <div className="linha" style={{ justifyContent: "space-between", cursor: "pointer" }} onClick={() => setAberto(a)}>
                 <b>{a.titulo}</b>
                 <span className={`status-${a.status}`}>{NOMES_STATUS_AGD[a.status]}</span>
               </div>
-              <span className="ajuda">
-                {formatarData(a.data)} · {a.tipo} · {a.redes.join(", ") || "sem rede"}
-              </span>
-            </button>
+              <div className="linha" style={{ justifyContent: "space-between", marginTop: 6 }}>
+                <span className="ajuda">
+                  {formatarData(a.data)} · {a.tipo} · {a.redes.join(", ") || "sem rede"}
+                </span>
+                <div className="linha" style={{ gap: 6 }}>
+                  {a.status !== "postado" && (
+                    <button className="botao sec peq" onClick={() => mudarStatus(a.id, a.status === "a_programar" ? "programado" : "postado")}>
+                      <Icone nome="check" tamanho={14} /> {a.status === "a_programar" ? "Programado" : "Postado"}
+                    </button>
+                  )}
+                  <button className="botao sec peq" onClick={() => copiar(a)}>
+                    <Icone nome="copiar" tamanho={14} /> Legenda
+                  </button>
+                  <button className="botao sec peq" onClick={() => duplicar(a)} title="Duplicar para a semana seguinte">
+                    Duplicar
+                  </button>
+                  <button className="botao sec peq" onClick={() => setAberto(a)}>
+                    Abrir
+                  </button>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       )}

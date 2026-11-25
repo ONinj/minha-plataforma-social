@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { mensagemDePerfil } from "@/lib/perfil";
+import { mensagemDePerfil, textoDoPerfil } from "@/lib/perfil";
 import { chamarClaude } from "@/lib/servicos";
 import { useStore } from "@/lib/store";
 import ChatClaudeView from "../ChatClaudeView";
+import Icone from "../Icone";
 
 const SYSTEM =
   "Você é o Claude, assistente de marketing e criação de conteúdo para redes sociais. Responda em português do Brasil, de forma clara e prática. Quando pedirem prompts para outras IAs (Gemini, Veo, Seedance), escreva prompts detalhados prontos para copiar.";
@@ -20,7 +21,7 @@ export default function ClaudeDireto() {
     const tamanhoAntes = store.obter().chatClaude.length;
     store.atualizar((e) => {
       const chat = [...e.chatClaude, { role: "user" as const, content: texto }];
-      const perfil = mensagemDePerfil(chat, e.config.perfilMarca);
+      const perfil = mensagemDePerfil(chat, textoDoPerfil(store));
       return { ...e, chatClaude: perfil ? [...chat, perfil] : chat };
     });
     try {
@@ -51,10 +52,14 @@ export default function ClaudeDireto() {
       placeholder="Converse direto com o Claude…"
       aoEnviar={enviar}
       boasVindas={
-        <div className="cartao" style={{ maxWidth: 720 }}>
-          <h3>Claude (conversa direta)</h3>
+        <div className="boas-vindas">
+          <div className="orb" style={{ background: "linear-gradient(135deg, #e08a5f, #b45309)" }}>
+            <Icone nome="chat" tamanho={28} />
+          </div>
+          <h2 className="titulo-pagina">Conversa direta com o Claude</h2>
           <p className="ajuda">
-            Conversa livre com o Claude, sem acionar as outras IAs. Bom para ideias, roteiros, legendas e prompts.
+            Sem acionar as outras IAs. Bom para ideias, roteiros, legendas, respostas a comentários e prompts. Ele já conhece
+            o perfil <b>{store.marca.nome}</b>.
           </p>
         </div>
       }

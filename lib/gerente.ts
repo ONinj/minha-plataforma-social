@@ -4,7 +4,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { useStore } from "./store";
 import { chamarClaude, custoEstimadoVideo, gerarImagem, iniciarVideo } from "./servicos";
 import type { Aprovacao, MensagemClaude, Midia, TipoConteudo } from "./tipos";
-import { mensagemDePerfil } from "./perfil";
+import { mensagemDePerfil, textoDoPerfil } from "./perfil";
 import { agoraISO, blobParaBase64, brl, novoId, reduzirImagem } from "./util";
 
 type Store = ReturnType<typeof useStore>;
@@ -48,17 +48,18 @@ async function checarReferencias(
 
 // O texto de sistema nunca muda durante a conversa (exigência do Claude para manter o
 // raciocínio salvo válido). O perfil da marca entra como mensagem de sistema na conversa.
-export const SYSTEM_GERENTE = `Você é o gerente de marketing de uma plataforma pessoal de gestão de redes sociais. Você conversa em português do Brasil com o dono das redes, que só dá ideias e aprova o que você entrega.
+export const SYSTEM_GERENTE = `Você é o gerente de marketing de uma plataforma de gestão de redes sociais usada por social medias. Você conversa em português do Brasil com quem cuida do perfil, que só dá ideias e aprova o que você entrega. Cada conversa é de um único perfil (marca/cliente).
 
 Sua equipe (você aciona pelas ferramentas):
-- Gemini (ferramenta gerar_imagem): cria os criativos — cards do feed, stories, capas e as imagens de referência para os vídeos.
-- Veo e Seedance (ferramenta gerar_video): geram os vídeos. Use o Veo como padrão por ser mais barato; use o Seedance só quando a cena pedir algo que o Veo não entrega bem ou quando o usuário pedir. Para manter o visual consistente, gere antes uma imagem de referência com o Gemini e passe o id dela em imagem_inicial.
+- Nano Banana 2 (ferramenta gerar_imagem): cria os criativos — cards do feed, stories, capas e as imagens de referência para os vídeos.
+- Veo e Seedance (ferramenta gerar_video): geram os vídeos. Use o Veo como padrão por ser mais barato; use o Seedance só quando a cena pedir algo que o Veo não entrega bem ou quando o usuário pedir. Para manter o visual consistente, gere antes uma imagem de referência e passe o id dela em imagem_inicial. Fotos reais enviadas pelo usuário são ótimas imagens iniciais (ex.: animar a foto de um produto).
 - Aprovação (ferramenta enviar_para_aprovacao): tudo o que estiver pronto para publicar vai para a fila de aprovação, com legenda, hashtags, redes e data sugerida. Nada é publicado sem o "aprovado" do usuário.
 
 Como trabalhar:
 - Quando pedirem um planejamento mensal, primeiro proponha o calendário (datas, formatos, temas, objetivo de cada post) em uma tabela e envie o planejamento completo como um item do tipo "planejamento" para aprovação. Só produza as peças depois que o usuário aprovar ou pedir.
 - Escreva prompts de imagem e vídeo detalhados (estilo, luz, enquadramento, cores, texto na arte, proporção). Prompts de vídeo devem descrever movimento de câmera, ação e duração.
-- Revise cada imagem que o Gemini devolver (você recebe a imagem). Se não estiver boa, gere de novo com um prompt corrigido antes de mandar para aprovação, mas no máximo 2 tentativas por peça para não gastar à toa.
+- Imagens feitas por IA só podem ser usadas como referência com aprovação do usuário; a plataforma pede essa aprovação automaticamente quando você tentar usar. Fotos enviadas pelo usuário já estão liberadas.
+- Revise cada imagem gerada (você recebe a imagem). Se não estiver boa, gere de novo com um prompt corrigido antes de mandar para aprovação, mas no máximo 2 tentativas por peça para não gastar à toa.
 - Vídeos levam alguns minutos para ficar prontos; eles aparecem sozinhos na aprovação quando você incluir o id do vídeo nas mídias do item.
 - Formatos: feed 4:5 ou 1:1, stories e reels 9:16.
 - Seja direto e organizado. No fim de cada entrega, resuma o que foi feito e o que está esperando aprovação.
@@ -69,12 +70,12 @@ export const FERRAMENTAS: Anthropic.Beta.BetaTool[] = [
   {
     name: "gerar_imagem",
     description:
-      "Pede ao Gemini uma imagem (card, story, capa ou referência para vídeo). Devolve o id da mídia e a própria imagem para você revisar. Pode usar imagens já existentes como referência visual.",
+      "Gera uma imagem com o Nano Banana 2 (card, story, capa ou referência para vídeo). Devolve o id da mídia e a própria imagem para você revisar. Pode usar imagens já existentes como referência visual.",
     input_schema: {
       type: "object",
       properties: {
         titulo: { type: "string", description: "Nome curto da peça, ex.: 'Card dica 1 - semana 2'" },
-        prompt: { type: "string", description: "Prompt detalhado para o Gemini" },
+        prompt: { type: "string", description: "Prompt detalhado para o gerador de imagens" },
         proporcao: { type: "string", enum: ["1:1", "4:5", "9:16", "16:9", "3:4"] },
         referencias: {
           type: "array",
@@ -169,7 +170,7 @@ async function executar(
         const conteudo: Exclude<ResultadoFerramenta["content"], string | undefined> = [
           {
             type: "text",
-            text: `Imagem gerada. ${midias.map((m) => `[midia:${m.id}]`).join(" ")}${texto ? `\nObservação do Gemini: ${texto}` : ""}`,
+            text: `Imagem gerada. ${midias.map((m) => `[midia:${m.id}]`).join(" ")}${texto ? `\nObservação do gerador: ${texto}` : ""}`,
           },
         ];
         for (const m of midias) {
@@ -278,7 +279,7 @@ export async function rodarGerente(
   const hoje = new Date().toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" });
   const tamanhoAntes = store.obter().chatGerente.length;
   adicionarMensagem(store, { role: "user", content: await montarMensagem(store, `[Agora: ${hoje}]\n${texto}`, anexos) });
-  const perfil = mensagemDePerfil(store.obter().chatGerente, store.obter().config.perfilMarca);
+  const perfil = mensagemDePerfil(store.obter().chatGerente, textoDoPerfil(store));
   if (perfil) adicionarMensagem(store, perfil);
 
   for (let volta = 0; volta < 25; volta++) {
@@ -318,7 +319,7 @@ function descreverEtapa(b: Anthropic.Beta.BetaToolUseBlock): string {
   const e = b.input as Record<string, unknown>;
   switch (b.name) {
     case "gerar_imagem":
-      return `Gemini criando: ${e.titulo ?? "imagem"}...`;
+      return `Nano Banana criando: ${e.titulo ?? "imagem"}...`;
     case "gerar_video":
       return `${e.provedor === "seedance" ? "Seedance" : "Veo"} recebendo o vídeo: ${e.titulo ?? ""}...`;
     case "enviar_para_aprovacao":
