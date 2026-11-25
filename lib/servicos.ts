@@ -4,30 +4,36 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { useStore } from "./store";
 import { PRECOS_CLAUDE, type Configuracoes, type MensagemClaude, type Midia } from "./tipos";
 import { recortarVideo, urlNoFal } from "./biblioteca";
+import { MODO_NUVEM, cabecalhosNuvem, enviarArquivo, observarResposta } from "./nuvem";
 import { agoraISO, base64ParaBlob, blobParaBase64, novoId, reduzirImagem } from "./util";
 
 type Store = ReturnType<typeof useStore>;
 
-async function postJSON<T>(url: string, corpo: unknown, headers: Record<string, string>): Promise<T> {
+type Cabecalhos = Record<string, string> | Promise<Record<string, string>>;
+
+async function postJSON<T>(url: string, corpo: unknown, headers: Cabecalhos): Promise<T> {
   const resp = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
+    headers: { "Content-Type": "application/json", ...(await headers) },
     body: JSON.stringify(corpo),
   });
   const j = await resp.json().catch(() => ({}));
+  if (MODO_NUVEM) observarResposta(resp, j);
   if (!resp.ok) throw new Error(j.error ?? `Erro ${resp.status}`);
   return j as T;
 }
 
-async function getJSON<T>(url: string, headers: Record<string, string>): Promise<T> {
-  const resp = await fetch(url, { headers });
+async function getJSON<T>(url: string, headers: Cabecalhos): Promise<T> {
+  const resp = await fetch(url, { headers: await headers });
   const j = await resp.json().catch(() => ({}));
+  if (MODO_NUVEM) observarResposta(resp, j);
   if (!resp.ok) throw new Error(j.error ?? `Erro ${resp.status}`);
   return j as T;
 }
 
-const hAnthropic = (c: Configuracoes) => ({ "x-anthropic-key": c.chaveAnthropic });
-const hFal = (c: Configuracoes) => ({ "x-fal-key": c.chaveFal });
+/** No modo nuvem vai o login (as chaves ficam no servidor); no modo local, as chaves do navegador. */
+const hAnthropic = (c: Configuracoes): Cabecalhos => (MODO_NUVEM ? cabecalhosNuvem() : { "x-anthropic-key": c.chaveAnthropic });
+const hFal = (c: Configuracoes): Cabecalhos => (MODO_NUVEM ? cabecalhosNuvem() : { "x-fal-key": c.chaveFal });
 
 // ---------------- Claude ----------------
 
@@ -40,13 +46,15 @@ export async function chamarClaude(
     effort?: Configuracoes["esforcoGerente"];
     /** Usa outro modelo nesta chamada (ex.: Haiku para tarefas simples e baratas). */
     modelo?: string;
+    /** Como aparece no extrato de créditos (ex.: "Gerente"). */
+    uso?: string;
   },
 ): Promise<Anthropic.Beta.BetaMessage> {
   const config = store.obter().config;
-  if (!config.chaveAnthropic) throw new Error("Cadastre a chave da Anthropic em Configurações.");
+  if (!MODO_NUVEM && !config.chaveAnthropic) throw new Error("Cadastre a chave da Anthropic em Configurações.");
   const resposta = await postJSON<Anthropic.Beta.BetaMessage>(
     "/api/claude",
-    { model: params.modelo ?? config.modeloClaude, system: params.system, messages: params.messages, tools: params.tools, effort: params.effort },
+    { model: params.modelo ?? config.modeloClaude, system: params.system, messages: params.messages, tools: params.tools, effort: params.effort, uso: params.uso },
     hAnthropic(config),
   );
   store.registrarGasto("claude", custoClaude(resposta));
@@ -106,7 +114,7 @@ export async function gerarImagemFal(
   params: { prompt: string; proporcao?: string; referencias?: string[]; titulo: string },
 ): Promise<{ midias: Midia[]; texto: string }> {
   const config = store.obter().config;
-  if (!config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
+  if (!MODO_NUVEM && !config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
   const referencias = [];
   for (const id of params.referencias ?? []) {
     const inline = await midiaParaInline(store, id, 1536);
@@ -154,11 +162,13 @@ export async function iniciarVideo(
 ): Promise<Midia> {
   const config = store.obter().config;
   let videoReferenciaUrl: string | undefined;
+  let videoReferenciaCaminho: string | undefined;
+  let segundosReferencia: number | undefined;
   if (params.videoReferenciaId) {
     if (params.provedor !== "seedance") throw new Error("Só o Seedance aceita vídeo de referência. Use provedor 'seedance'.");
     const ref = store.obter().midias.find((m) => m.id === params.videoReferenciaId);
     if (!ref || ref.tipo !== "video") throw new Error("Vídeo de referência não encontrado na biblioteca.");
-    if (!config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
+    if (!MODO_NUVEM && !config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
     const longo = (ref.duracao ?? 0) > 30;
     if (longo || (params.trechoInicio ?? 0) > 0) {
       const inicio = Math.max(0, Math.min(params.trechoInicio ?? 0, (ref.duracao ?? 15) - 3));
@@ -168,10 +178,17 @@ export async function iniciarVideo(
       if (!blob) throw new Error("Arquivo do vídeo de referência não encontrado.");
       const trecho = await recortarVideo(blob, inicio, segundos);
       params.aoEtapa?.("Enviando o trecho para o Seedance...");
-      videoReferenciaUrl = await urlNoFal(store, ref, trecho);
+      segundosReferencia = segundos;
+      if (MODO_NUVEM) videoReferenciaCaminho = await enviarArquivo(`trecho_${ref.id}_${Date.now()}`, trecho);
+      else videoReferenciaUrl = await urlNoFal(store, ref, trecho);
     } else {
       params.aoEtapa?.(`Enviando "${ref.titulo}" para o Seedance...`);
-      videoReferenciaUrl = await urlNoFal(store, ref);
+      segundosReferencia = ref.duracao;
+      if (MODO_NUVEM) {
+        const blob = await store.lerBlob(ref.id);
+        if (!blob) throw new Error("Arquivo do vídeo de referência não encontrado.");
+        videoReferenciaCaminho = await enviarArquivo(ref.id, blob);
+      } else videoReferenciaUrl = await urlNoFal(store, ref);
     }
   }
   let imagem: { mimeType: string; base64: string } | undefined;
@@ -181,11 +198,11 @@ export async function iniciarVideo(
   }
 
   let job: Midia["job"];
-  if (!config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
+  if (!MODO_NUVEM && !config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
   if (params.provedor === "veo") {
     const r = await postJSON<{ endpoint: string; requestId: string }>(
       "/api/fal/video-start",
-      { familia: "veo", modelo: config.modeloVeoFal, prompt: params.prompt, imagem, proporcao: params.proporcao },
+      { familia: "veo", modelo: config.modeloVeoFal, prompt: params.prompt, titulo: params.titulo, imagem, proporcao: params.proporcao },
       hFal(config),
     );
     job = { provedor: "fal", endpoint: r.endpoint, requestId: r.requestId };
@@ -195,7 +212,10 @@ export async function iniciarVideo(
       {
         familia: "seedance",
         modelo: config.prefixoSeedance,
+        titulo: params.titulo,
         videoReferenciaUrl,
+        videoReferenciaCaminho,
+        segundosReferencia,
         prompt: params.prompt,
         imagem,
         resolucao: config.resolucaoSeedance,
@@ -254,7 +274,7 @@ export async function verificarVideos(store: Store) {
       }
       if (r.erro || !r.url) {
         store.atualizarMidia(m.id, { status: "erro", erro: r.erro, prontoEm: agoraISO() });
-        store.avisar(`O vídeo "${m.titulo}" falhou.`, "erro");
+        store.avisar(`O vídeo "${m.titulo}" falhou.${MODO_NUVEM ? " Os créditos foram devolvidos." : ""}`, "erro");
         continue;
       }
       store.atualizarMidia(m.id, { fase: "baixando" });

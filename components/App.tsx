@@ -3,7 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { verificarVideos } from "@/lib/servicos";
 import { StoreProvider, totalContaMes, totalMes, useStore } from "@/lib/store";
+import { formatarCreditos } from "@/lib/custo";
+import { MODO_NUVEM } from "@/lib/nuvem";
 import { brl } from "@/lib/util";
+import Admin from "./abas/Admin";
+import Plano from "./abas/Plano";
+import Login from "./Login";
 import Agendamentos from "./abas/Agendamentos";
 import Aprovacoes from "./abas/Aprovacoes";
 import Biblioteca from "./abas/Biblioteca";
@@ -32,6 +37,8 @@ export type IdAba =
   | "biblioteca"
   | "ideias"
   | "perfis"
+  | "plano"
+  | "admin"
   | "config";
 
 type Aba = { id: IdAba; nome: string; icone: string; descricao: string; cor?: string };
@@ -62,7 +69,9 @@ const SECOES: { titulo?: string; abas: Aba[] }[] = [
     titulo: "Conta",
     abas: [
       { id: "perfis", nome: "Perfis e redes", icone: "perfis", descricao: "Os perfis (clientes) desta conta e as redes conectadas" },
-      { id: "config", nome: "Configurações", icone: "config", descricao: "Chaves das IAs, modelos e controle de gastos" },
+      { id: "plano", nome: "Plano e créditos", icone: "carteira", descricao: "Seu plano, saldo de créditos, recargas e extrato" },
+      { id: "config", nome: "Configurações", icone: "config", descricao: "Modelos, confirmações e dados" },
+      { id: "admin", nome: "Administração", icone: "estrela", descricao: "Contas, planos e créditos de todos os clientes" },
     ],
   },
 ];
@@ -119,11 +128,12 @@ function Plataforma() {
   }, [qtdGerando]);
 
   useEffect(() => {
-    if (carregado && !conta.config.chaveAnthropic && !conta.config.chaveFal) setAba("config");
+    if (!MODO_NUVEM && carregado && !conta.config.chaveAnthropic && !conta.config.chaveFal) setAba("config");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carregado]);
 
-  if (!carregado) {
+  if (MODO_NUVEM && carregado && store.sessao === "sem_login") return <Login />;
+  if (!carregado || (MODO_NUVEM && store.sessao !== "pronta")) {
     return (
       <div className="vazio" style={{ paddingTop: "40vh" }}>
         <div className="girando" style={{ margin: "0 auto" }} />
@@ -131,6 +141,12 @@ function Plataforma() {
     );
   }
 
+  const nuvem = store.nuvem;
+  // Abas que dependem do plano (modo nuvem): mostram cadeado e um convite para mudar de plano.
+  const travada = (id: IdAba) =>
+    !!nuvem && ((id === "seedance" && !nuvem.recursos.seedance) || (id === "biblioteca" && !nuvem.recursos.biblioteca));
+  const visivel = (id: IdAba) =>
+    (id !== "plano" || MODO_NUVEM) && (id !== "admin" || !!nuvem?.usuario.admin);
   const atual = TODAS.find((a) => a.id === aba)!;
   const pendentes = estado.aprovacoes.filter((a) => a.status === "pendente").length;
   const cambio = conta.config.cambio;
@@ -171,17 +187,41 @@ function Plataforma() {
         {SECOES.map((s, i) => (
           <div key={i} style={{ display: "contents" }}>
             {s.titulo && <div className="secao-titulo">{s.titulo}</div>}
-            {s.abas.map((a) => (
+            {s.abas.filter((a) => visivel(a.id)).map((a) => (
               <button key={a.id} className={`aba ${aba === a.id ? "ativa" : ""}`} onClick={() => ir(a.id)}>
                 <Icone nome={a.icone} />
                 {a.nome}
                 {a.id === "aprovacoes" && pendentes > 0 && <span className="contador">{pendentes}</span>}
-                {a.cor && <span className="ponto-cor" style={{ background: a.cor }} />}
+                {travada(a.id) ? (
+                  <span className="trava" title="Não incluído no seu plano">🔒</span>
+                ) : (
+                  a.cor && <span className="ponto-cor" style={{ background: a.cor }} />
+                )}
               </button>
             ))}
           </div>
         ))}
 
+        {nuvem ? (
+          <button className="gasto" style={{ marginTop: 18, textAlign: "left", cursor: "pointer", color: "inherit" }} onClick={() => ir("plano")}>
+            <div className="linha" style={{ gap: 6 }}>
+              <Icone nome="carteira" tamanho={15} /> Créditos · plano {nuvem.plano.nome}
+            </div>
+            <strong>{formatarCreditos(nuvem.conta.saldo)}</strong>
+            {nuvem.plano.creditos_mensais > 0 && (
+              <div className={`barra ${nuvem.conta.saldo < nuvem.plano.creditos_mensais * 0.2 ? "alerta" : ""}`}>
+                <div style={{ width: `${Math.min(100, (nuvem.conta.saldo / nuvem.plano.creditos_mensais) * 100)}%` }} />
+              </div>
+            )}
+            <div style={{ marginTop: 6, fontSize: 11.5, color: nuvem.conta.status === "atrasado" ? "var(--erro)" : "var(--texto-3)" }}>
+              {nuvem.conta.status === "atrasado"
+                ? "Pagamento em aberto"
+                : nuvem.conta.status === "teste"
+                  ? "Teste grátis · escolha um plano"
+                  : "Recarregar ou mudar de plano"}
+            </div>
+          </button>
+        ) : (
         <div className="gasto" style={{ marginTop: 18 }}>
           <div className="linha" style={{ gap: 6 }}>
             <Icone nome="carteira" tamanho={15} /> Gasto do mês · conta
@@ -199,6 +239,7 @@ function Plataforma() {
             Neste perfil: {brl(totalMes(marca.gastos) * cambio)}
           </div>
         </div>
+        )}
       </nav>
 
       <main className="principal">
@@ -219,18 +260,50 @@ function Plataforma() {
               </button>
             )}
             <Notificacoes ir={ir} />
-            <button
-              className="botao-icone"
-              title={`${marca.nome}: trocar perfil`}
-              onClick={() => setMenuAberto(true)}
-              style={{ padding: 0, border: 0, background: "none" }}
-            >
-              <Avatar nome={marca.nome} cor={marca.cor} tamanho={34} />
-            </button>
+            {nuvem ? (
+              <MenuUsuario ir={ir} />
+            ) : (
+              <button
+                className="botao-icone"
+                title={`${marca.nome}: trocar perfil`}
+                onClick={() => setMenuAberto(true)}
+                style={{ padding: 0, border: 0, background: "none" }}
+              >
+                <Avatar nome={marca.nome} cor={marca.cor} tamanho={34} />
+              </button>
+            )}
           </div>
         </header>
 
+        {store.importavel && (
+          <div className="cartao" style={{ margin: "14px 28px 0", borderColor: "rgba(139,92,246,.5)" }}>
+            <div className="linha" style={{ justifyContent: "space-between" }}>
+              <span>
+                <b>Encontramos perfis salvos só neste navegador.</b>{" "}
+                <span className="ajuda">Quer levar para a sua conta na nuvem? (conversas, mídias, aprovações e calendário)</span>
+              </span>
+              <span className="linha">
+                <button className="botao sec peq" onClick={store.recusarImportacao}>Agora não</button>
+                <button className="botao peq" onClick={store.importarLocal}>Importar para a nuvem</button>
+              </span>
+            </div>
+          </div>
+        )}
         <div className="area" key={`${raiz.contaAtiva}-${marca.id}`}>
+          {travada(aba) && (
+            <div className="conteudo">
+              <div className="cartao" style={{ maxWidth: 620, margin: "8vh auto", textAlign: "center" }}>
+                <div style={{ fontSize: 36 }}>🔒</div>
+                <h2 className="titulo-pagina">{atual.nome} não está no seu plano</h2>
+                <p className="ajuda">
+                  {aba === "seedance"
+                    ? "O Seedance faz os vídeos mais cinematográficos e pode animar a partir dos seus próprios vídeos. Ele vem a partir do plano Profissional."
+                    : "A biblioteca guarda seus vídeos e fotos prontos para o gerente usar como referência. Ela vem a partir do plano Profissional."}
+                </p>
+                <button className="botao" onClick={() => ir("plano")}>Ver planos</button>
+              </div>
+            </div>
+          )}
           {aba === "inicio" && <Inicio ir={ir} falarComGerente={falarComGerente} />}
           {aba === "central" && (
             <Gerente
@@ -243,7 +316,7 @@ function Plataforma() {
           {aba === "claude" && <ClaudeDireto />}
           {aba === "gemini" && <Gemini />}
           {aba === "veo" && <Video key="veo" provedor="veo" />}
-          {aba === "seedance" && <Video key="seedance" provedor="seedance" />}
+          {aba === "seedance" && !travada("seedance") && <Video key="seedance" provedor="seedance" />}
           {aba === "aprovacoes" && <Aprovacoes falarComGerente={falarComGerente} />}
           {aba === "agendamentos" && <Agendamentos />}
           {aba === "midias" && (
@@ -254,7 +327,7 @@ function Plataforma() {
               }}
             />
           )}
-          {aba === "biblioteca" && (
+          {aba === "biblioteca" && !travada("biblioteca") && (
             <Biblioteca
               mandarParaCentral={(ids) => {
                 setAnexosParaGerente(ids);
@@ -265,6 +338,8 @@ function Plataforma() {
           {aba === "ideias" && <Ideias falarComGerente={falarComGerente} />}
           {aba === "perfis" && <Perfis />}
           {aba === "config" && <Configuracoes />}
+          {aba === "plano" && nuvem && <Plano />}
+          {aba === "admin" && nuvem?.usuario.admin && <Admin />}
         </div>
       </main>
       <Avisos />
@@ -315,7 +390,7 @@ function SeletorConta() {
               {c.id === conta.id && <Icone nome="check" tamanho={16} />}
             </button>
           ))}
-          <button
+          {!MODO_NUVEM && <button
             className="menu-item"
             onClick={() => {
               setAberto(false);
@@ -326,7 +401,7 @@ function SeletorConta() {
               <Icone nome="mais" tamanho={15} />
             </span>
             Adicionar conta
-          </button>
+          </button>}
         </div>
       )}
       {nova && (
@@ -477,6 +552,35 @@ function Avisos() {
           </button>
         </div>
       ))}
+    </div>
+  );
+}
+
+function MenuUsuario({ ir }: { ir: (a: IdAba) => void }) {
+  const { nuvem, sair } = useStore();
+  const [aberto, setAberto] = useState(false);
+  if (!nuvem) return null;
+  return (
+    <div style={{ position: "relative" }}>
+      <button className="botao-icone" style={{ padding: 0, border: 0, background: "none" }} onClick={() => setAberto((v) => !v)} aria-label="Sua conta">
+        <Avatar nome={nuvem.usuario.email} cor="#6366f1" tamanho={34} />
+      </button>
+      {aberto && (
+        <div className="menu-flutuante" style={{ left: "auto", right: 0, width: 260 }}>
+          <div className="menu-item" style={{ cursor: "default" }}>
+            <span>
+              {nuvem.usuario.email}
+              <span className="sub">Plano {nuvem.plano.nome}</span>
+            </span>
+          </div>
+          <button className="menu-item" onClick={() => { ir("plano"); setAberto(false); }}>
+            <Icone nome="carteira" /> Plano e créditos
+          </button>
+          <button className="menu-item" onClick={() => sair()}>
+            <Icone nome="sair" /> Sair
+          </button>
+        </div>
+      )}
     </div>
   );
 }

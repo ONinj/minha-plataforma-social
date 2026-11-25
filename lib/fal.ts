@@ -1,7 +1,8 @@
 import { createFalClient } from "@fal-ai/client";
+import { chaveFal } from "./servidor/contexto";
 
 export function clienteFal(req: Request) {
-  const chave = req.headers.get("x-fal-key");
+  const chave = chaveFal(req);
   return chave ? createFalClient({ credentials: chave }) : null;
 }
 

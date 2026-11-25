@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { gerarImagemFal } from "@/lib/servicos";
 import { useStore } from "@/lib/store";
 import type { MensagemGemini, ParteGemini } from "@/lib/tipos";
-import { brl } from "@/lib/util";
+import { textoCusto } from "@/lib/custo";
 import { Etapa } from "../ChatClaudeView";
 import Icone from "../Icone";
 import Microfone from "../Microfone";
@@ -35,7 +35,7 @@ export default function Gemini() {
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string>();
   const fim = useRef<HTMLDivElement>(null);
-  const custo = estado.config.precoImagem * estado.config.cambio;
+  const custoTexto = textoCusto(estado.config.precoImagem, estado.config.cambio);
 
   useEffect(() => {
     fim.current?.scrollIntoView({ behavior: "smooth" });
@@ -164,7 +164,7 @@ export default function Gemini() {
             </button>
           )}
           <span className="ajuda" style={{ marginLeft: "auto", fontSize: 12 }}>
-            ~{brl(custo)} por imagem
+            ~{custoTexto} por imagem
           </span>
           <button className="botao" onClick={() => enviar()} disabled={ocupado || !texto.trim()}>
             <Icone nome="enviar" tamanho={15} /> Gerar

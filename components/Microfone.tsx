@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { falNoNavegador } from "@/lib/biblioteca";
+import { MODO_NUVEM, api, enviarArquivo } from "@/lib/nuvem";
 import { formatarTempo } from "@/lib/progresso";
 import { useStore } from "@/lib/store";
 import Icone from "./Icone";
@@ -95,16 +96,24 @@ export default function Microfone({
       }
       setEstado("transcrevendo");
       try {
-        const fal = falNoNavegador(chave);
         const audio = new Blob(partes, { type: (gravador.mimeType || "audio/webm").split(";")[0] });
-        const url = await fal.storage.upload(audio);
-        let r;
-        try {
-          r = await fal.subscribe("fal-ai/whisper", { input: { audio_url: url, task: "transcribe", language: "pt" } });
-        } catch {
-          r = await fal.subscribe("fal-ai/whisper", { input: { audio_url: url, task: "transcribe" } });
+        let texto: string;
+        if (MODO_NUVEM) {
+          // Na nuvem o áudio vai para o armazenamento da conta e o servidor transcreve (cobra em créditos).
+          const ext = audio.type.includes("mp4") ? "m4a" : audio.type.includes("ogg") ? "ogg" : "webm";
+          const caminho = await enviarArquivo(`voz_${Date.now()}.${ext}`, audio);
+          texto = (await api<{ texto: string }>("/api/voz", { corpo: { caminho, segundos: (Date.now() - inicio) / 1000 } })).texto;
+        } else {
+          const fal = falNoNavegador(chave);
+          const url = await fal.storage.upload(audio);
+          let r;
+          try {
+            r = await fal.subscribe("fal-ai/whisper", { input: { audio_url: url, task: "transcribe", language: "pt" } });
+          } catch {
+            r = await fal.subscribe("fal-ai/whisper", { input: { audio_url: url, task: "transcribe" } });
+          }
+          texto = String((r.data as { text?: string }).text ?? "").trim();
         }
-        const texto = String((r.data as { text?: string }).text ?? "").trim();
         if (texto) aoFinal(texto);
         else store.avisar("Não entendi o áudio. Tente falar mais perto do microfone.", "erro");
       } catch (e) {
@@ -159,7 +168,7 @@ export default function Microfone({
   function alternar() {
     if (estado === "ouvindo") return parar.current();
     const chave = store.obter().config.chaveFal;
-    if (chave) gravarComWhisper(chave);
+    if (MODO_NUVEM || chave) gravarComWhisper(chave);
     else reconhecerNoNavegador();
   }
 

@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { db } from "./db";
+import { MODO_NUVEM, api, baixarArquivo, eventosNuvem, supabase } from "./nuvem";
+import { Sincronizador, carregarDaNuvem, configDoPlano, enfileirarEnvio, type InfoNuvem } from "./sincronia";
 import {
   CONFIG_PADRAO,
   CORES,
@@ -53,6 +55,14 @@ type Contexto = {
   avisos: Aviso[];
   avisar: (texto: string, tipo?: Aviso["tipo"]) => void;
   fecharAviso: (id: string) => void;
+  // Modo nuvem (login, plano e créditos). Nulo no modo local.
+  nuvem: InfoNuvem | null;
+  sessao: "carregando" | "sem_login" | "pronta";
+  recarregarNuvem: () => Promise<void>;
+  importavel: boolean;
+  importarLocal: () => Promise<void>;
+  recusarImportacao: () => void;
+  sair: () => Promise<void>;
 };
 
 const Ctx = createContext<Contexto | null>(null);
@@ -190,12 +200,38 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [tarefa, definirTarefa] = useState<string>();
   const definirOcupado = useCallback((v: boolean) => setTrabalhos((n) => Math.max(0, n + (v ? 1 : -1))), []);
   const [avisos, setAvisos] = useState<Aviso[]>([]);
+  const [nuvem, setNuvem] = useState<InfoNuvem | null>(null);
+  const [sessao, setSessao] = useState<"carregando" | "sem_login" | "pronta">(MODO_NUVEM ? "carregando" : "pronta");
+  const [importavel, setImportavel] = useState<Raiz | null>(null);
   const ref = useRef<Raiz>(raiz);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ultimaSincronia = useRef(0);
+
+  const avisar = useCallback((texto: string, tipo: Aviso["tipo"] = "info") => {
+    const id = novoId("av");
+    setAvisos((a) => [...a, { id, texto, tipo }]);
+    setTimeout(() => setAvisos((a) => a.filter((x) => x.id !== id)), 7000);
+  }, []);
+  const fecharAviso = useCallback((id: string) => setAvisos((a) => a.filter((x) => x.id !== id)), []);
+
+  const sinc = useRef<Sincronizador | null>(null);
+  if (MODO_NUVEM && !sinc.current) {
+    sinc.current = new Sincronizador(
+      (m) => avisar(`Não consegui salvar na nuvem: ${m}`, "erro"),
+      (m) => avisar(m, "erro"),
+    );
+  }
 
   const salvarAgora = useCallback(() => {
     timer.current = null;
-    db.gravar(CHAVE_RAIZ, ref.current).catch((e) => console.error("Falha ao salvar", e));
+    if (MODO_NUVEM) {
+      const r = ref.current;
+      const conta = r.contas.find((c) => c.id === r.contaAtiva);
+      if (conta) localStorage.setItem(`perfil-ativo:${conta.id}`, conta.marcaAtiva);
+      void sinc.current?.salvar(r);
+    } else {
+      db.gravar(CHAVE_RAIZ, ref.current).catch((e) => console.error("Falha ao salvar", e));
+    }
   }, []);
 
   const definirRaiz = useCallback(
@@ -203,12 +239,95 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ref.current = nova;
       setRaiz(nova);
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(salvarAgora, 150);
+      timer.current = setTimeout(salvarAgora, MODO_NUVEM ? 1200 : 150);
     },
     [salvarAgora],
   );
 
+  /** Carrega (ou recarrega) a conta da nuvem. */
+  const carregarNuvem = useCallback(
+    async (contaPedida?: string) => {
+      const { raiz: r, info, ultimo } = await carregarDaNuvem(contaPedida);
+      ref.current = r;
+      setRaiz(r);
+      setNuvem(info);
+      sinc.current?.marcarSalvo(r);
+      ultimaSincronia.current = ultimo;
+      setSessao("pronta");
+      // Dados antigos deste navegador que ainda não estão na nuvem?
+      if (!ultimo) {
+        const local = await db.ler<Raiz>(CHAVE_RAIZ);
+        const temConteudo = local?.contas?.some((c) =>
+          c.marcas.some((m) => m.chatGerente.length || m.midias.length || m.aprovacoes.length || m.agendamentos.length || m.perfil),
+        );
+        if (local && temConteudo && !localStorage.getItem("importacao-recusada")) setImportavel(completar(local));
+      }
+    },
+    [],
+  );
+
+  const recarregarNuvem = useCallback(async () => {
+    if (!MODO_NUVEM) return;
+    try {
+      const info = await api<InfoNuvem>("/api/conta");
+      setNuvem(info);
+      const config = configDoPlano(info);
+      definirRaiz(mudarConta(ref.current, ref.current.contaAtiva, (c) => ({ ...c, config: { ...config } })));
+    } catch {
+      /* segue com o que tem */
+    }
+  }, [definirRaiz]);
+
   useEffect(() => {
+    if (MODO_NUVEM) {
+      const sb = supabase();
+      let iniciou = false;
+      const iniciar = async () => {
+        if (iniciou) return;
+        iniciou = true;
+        try {
+          await carregarNuvem();
+        } catch (e) {
+          iniciou = false;
+          const codigo = (e as { codigo?: string }).codigo;
+          if (codigo === "sem_login") setSessao("sem_login");
+          else avisar(`Não consegui carregar sua conta: ${e instanceof Error ? e.message : e}`, "erro");
+        } finally {
+          setCarregado(true);
+        }
+      };
+      sb.auth.getSession().then(({ data }) => {
+        if (data.session) iniciar();
+        else {
+          setSessao("sem_login");
+          setCarregado(true);
+        }
+      });
+      const { data: sub } = sb.auth.onAuthStateChange((evento, s) => {
+        if (evento === "SIGNED_IN" && s) iniciar();
+        if (evento === "SIGNED_OUT") {
+          iniciou = false;
+          setSessao("sem_login");
+          setNuvem(null);
+        }
+      });
+      const aoSaldo = (e: Event) =>
+        setNuvem((n) => (n ? { ...n, conta: { ...n.conta, saldo: (e as CustomEvent<number>).detail } } : n));
+      const aoSessao = () => setSessao("sem_login");
+      const aoSemCreditos = (e: Event) => {
+        const corpo = (e as CustomEvent<{ error?: string }>).detail;
+        avisar(corpo?.error ?? "Seus créditos acabaram. Veja em Plano e créditos.", "erro");
+      };
+      eventosNuvem?.addEventListener("saldo", aoSaldo);
+      eventosNuvem?.addEventListener("sessao", aoSessao);
+      eventosNuvem?.addEventListener("sem-creditos", aoSemCreditos);
+      return () => {
+        sub.subscription.unsubscribe();
+        eventosNuvem?.removeEventListener("saldo", aoSaldo);
+        eventosNuvem?.removeEventListener("sessao", aoSessao);
+        eventosNuvem?.removeEventListener("sem-creditos", aoSemCreditos);
+      };
+    }
     (async () => {
       try {
         const salvo = await db.ler<Raiz>(CHAVE_RAIZ);
@@ -225,38 +344,74 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setCarregado(true);
       }
     })();
-  }, [definirRaiz]);
+  }, [definirRaiz, carregarNuvem, avisar]);
 
-  // Salva na hora se a aba for fechada ou ficar em segundo plano.
+  // Salva na hora se a aba ficar em segundo plano; ao voltar, traz o que mudou em outro aparelho.
   useEffect(() => {
+    const aoMudar = async () => {
+      if (document.visibilityState === "hidden") {
+        if (timer.current) {
+          clearTimeout(timer.current);
+          salvarAgora();
+        }
+        return;
+      }
+      if (!MODO_NUVEM || !nuvem || sinc.current?.pendente(ref.current)) return;
+      try {
+        const { perfis } = await api<{ perfis: { id: string; dados: Marca; apagado: boolean; em: number }[] }>(
+          `/api/perfis?desde=${ultimaSincronia.current}`,
+        );
+        if (!perfis.length) return;
+        ultimaSincronia.current = perfis.reduce((m, p) => Math.max(m, p.em), ultimaSincronia.current);
+        const r = mudarConta(ref.current, ref.current.contaAtiva, (c) => {
+          let marcas = c.marcas.filter((m) => !perfis.some((p) => p.id === m.id && p.apagado));
+          for (const p of perfis.filter((x) => !x.apagado)) {
+            marcas = marcas.some((m) => m.id === p.id) ? marcas.map((m) => (m.id === p.id ? p.dados : m)) : [...marcas, p.dados];
+          }
+          return { ...c, marcas, marcaAtiva: marcas.some((m) => m.id === c.marcaAtiva) ? c.marcaAtiva : marcas[0]?.id };
+        });
+        ref.current = r;
+        setRaiz(r);
+        sinc.current?.marcarSalvo(r);
+      } catch {
+        /* tenta na próxima */
+      }
+    };
     const aoSair = () => {
       if (timer.current) {
         clearTimeout(timer.current);
         salvarAgora();
       }
     };
-    document.addEventListener("visibilitychange", aoSair);
+    document.addEventListener("visibilitychange", aoMudar);
     window.addEventListener("pagehide", aoSair);
     return () => {
-      document.removeEventListener("visibilitychange", aoSair);
+      document.removeEventListener("visibilitychange", aoMudar);
       window.removeEventListener("pagehide", aoSair);
     };
-  }, [salvarAgora]);
+  }, [salvarAgora, nuvem]);
 
   const atualizar = useCallback(
     (fn: (e: Estado) => Estado) => definirRaiz(aplicarVisao(ref.current, fn(visao(ref.current)))),
     [definirRaiz],
   );
   const obter = useCallback(() => visao(ref.current), []);
-  const salvarBlob = useCallback((id: string, blob: Blob) => db.gravar(`blob:${id}`, blob), []);
-  const lerBlob = useCallback((id: string) => db.ler<Blob>(`blob:${id}`), []);
 
-  const avisar = useCallback((texto: string, tipo: Aviso["tipo"] = "info") => {
-    const id = novoId("av");
-    setAvisos((a) => [...a, { id, texto, tipo }]);
-    setTimeout(() => setAvisos((a) => a.filter((x) => x.id !== id)), 6000);
+  const salvarBlob = useCallback(async (id: string, blob: Blob) => {
+    await db.gravar(`blob:${id}`, blob);
+    if (MODO_NUVEM) enfileirarEnvio(id, blob);
   }, []);
-  const fecharAviso = useCallback((id: string) => setAvisos((a) => a.filter((x) => x.id !== id)), []);
+  const lerBlob = useCallback(async (id: string) => {
+    const local = await db.ler<Blob>(`blob:${id}`);
+    if (local || !MODO_NUVEM) return local;
+    try {
+      const daNuvem = await baixarArquivo(id);
+      if (daNuvem) await db.gravar(`blob:${id}`, daNuvem);
+      return daNuvem;
+    } catch {
+      return undefined;
+    }
+  }, []);
 
   const registrarGasto = useCallback(
     (categoria: CategoriaGasto, usd: number) => {
@@ -267,6 +422,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const atual = e.gastos[mes] ?? { claude: 0, gemini: 0, veo: 0, seedance: 0 };
         return { ...e, gastos: { ...e.gastos, [mes]: { ...atual, [categoria]: atual[categoria] + usd } } };
       });
+      if (MODO_NUVEM) return; // na nuvem quem controla é a carteira de créditos
       const { conta } = ativos(ref.current);
       const depois = totalContaMes(conta, mes) * conta.config.cambio;
       const teto = conta.config.orcamentoMensal;
@@ -301,8 +457,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
 
   const trocarConta = useCallback(
-    (id: string) => definirRaiz({ ...ref.current, contaAtiva: id }),
-    [definirRaiz],
+    (id: string) => {
+      if (MODO_NUVEM) {
+        if (timer.current) {
+          clearTimeout(timer.current);
+          salvarAgora();
+        }
+        carregarNuvem(id).catch((e) => avisar(e instanceof Error ? e.message : String(e), "erro"));
+        return;
+      }
+      definirRaiz({ ...ref.current, contaAtiva: id });
+    },
+    [definirRaiz, carregarNuvem, salvarAgora, avisar],
   );
   const trocarMarca = useCallback(
     (id: string) => {
@@ -313,6 +479,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   );
   const criarConta = useCallback(
     (d: { nome: string; email: string; copiarChaves: boolean }) => {
+      if (MODO_NUVEM) return;
       const atual = ativos(ref.current).conta.config;
       const config = d.copiarChaves ? { ...atual } : { ...atual, chaveAnthropic: "", chaveFal: "" };
       const conta = { ...novaConta(d.nome, d.email, config), cor: CORES[ref.current.contas.length % CORES.length] };
@@ -321,12 +488,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [definirRaiz],
   );
   const editarConta = useCallback(
-    (id: string, dados: Partial<Pick<Conta, "nome" | "email" | "cor">>) =>
-      definirRaiz(mudarConta(ref.current, id, (c) => ({ ...c, ...dados }))),
+    (id: string, dados: Partial<Pick<Conta, "nome" | "email" | "cor">>) => {
+      definirRaiz(mudarConta(ref.current, id, (c) => ({ ...c, ...dados })));
+      if (MODO_NUVEM && dados.nome) void api("/api/conta", { metodo: "PATCH", corpo: { nome: dados.nome } }).catch(() => {});
+    },
     [definirRaiz],
   );
   const removerConta = useCallback(
     (id: string) => {
+      if (MODO_NUVEM) return;
       const contas = ref.current.contas.filter((c) => c.id !== id);
       if (!contas.length) return;
       definirRaiz({ ...ref.current, contas, contaAtiva: ref.current.contaAtiva === id ? contas[0].id : ref.current.contaAtiva });
@@ -336,10 +506,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const criarMarca = useCallback(
     (d: { nome: string; arroba: string }) => {
       const { conta } = ativos(ref.current);
+      if (MODO_NUVEM && nuvem && conta.marcas.length >= nuvem.recursos.max_perfis) {
+        avisar(`Seu plano permite até ${nuvem.recursos.max_perfis} perfil(is). Mude de plano em Plano e créditos para criar mais.`, "erro");
+        return;
+      }
       const marca = novaMarca(d.nome, d.arroba, CORES[conta.marcas.length % CORES.length]);
       definirRaiz(mudarConta(ref.current, conta.id, (c) => ({ ...c, marcas: [...c.marcas, marca], marcaAtiva: marca.id })));
     },
-    [definirRaiz],
+    [definirRaiz, nuvem, avisar],
   );
   const editarMarca = useCallback(
     (id: string, dados: Partial<Pick<Marca, "nome" | "arroba" | "cor" | "perfil" | "redes">>) => {
@@ -367,9 +541,62 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           marcaAtiva: c.marcaAtiva === id ? marcas[0].id : c.marcaAtiva,
         })),
       );
+      if (MODO_NUVEM) void api(`/api/perfis?id=${encodeURIComponent(id)}`, { metodo: "DELETE" }).catch(() => {});
     },
     [definirRaiz],
   );
+
+  /** Leva os perfis e arquivos que estavam só neste navegador para a nuvem. */
+  const importarLocal = useCallback(async () => {
+    const local = importavel;
+    setImportavel(null);
+    if (!local || !nuvem) return;
+    const marcas = local.contas.flatMap((c) => c.marcas);
+    const limite = nuvem.recursos.max_perfis;
+    const escolhidas = marcas.slice(0, limite);
+    definirOcupado(true);
+    try {
+      const atual = ativos(ref.current).conta;
+      const vazias = atual.marcas.filter((m) => !m.chatGerente.length && !m.midias.length && !m.perfil);
+      definirRaiz(
+        mudarConta(ref.current, atual.id, (c) => {
+          const ficam = c.marcas.filter((m) => !vazias.includes(m));
+          const novas = [...ficam, ...escolhidas].slice(0, Math.max(limite, ficam.length));
+          return { ...c, marcas: novas, marcaAtiva: novas[0].id };
+        }),
+      );
+      vazias.forEach((m) => void api(`/api/perfis?id=${encodeURIComponent(m.id)}`, { metodo: "DELETE" }).catch(() => {}));
+      let n = 0;
+      const ids = escolhidas.flatMap((m) => m.midias.flatMap((x) => [x.id, ...Array.from({ length: x.quadros ?? 0 }, (_, i) => `${x.id}_q${i}`)]));
+      for (const id of ids) {
+        const b = await db.ler<Blob>(`blob:${id}`);
+        if (b) enfileirarEnvio(id, b);
+        definirTarefa(`Enviando arquivos para a nuvem: ${++n} de ${ids.length}`);
+      }
+      avisar(
+        marcas.length > limite
+          ? `Importei ${limite} de ${marcas.length} perfis (limite do seu plano). Os outros continuam neste navegador.`
+          : `Importei ${marcas.length} perfil(is) para a nuvem.`,
+        "ok",
+      );
+    } finally {
+      definirTarefa(undefined);
+      definirOcupado(false);
+    }
+  }, [importavel, nuvem, definirRaiz, definirOcupado, avisar]);
+
+  const recusarImportacao = useCallback(() => {
+    localStorage.setItem("importacao-recusada", "1");
+    setImportavel(null);
+  }, []);
+
+  const sair = useCallback(async () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      salvarAgora();
+    }
+    await supabase().auth.signOut();
+  }, [salvarAgora]);
 
   const { conta, marca } = ativos(raiz);
 
@@ -403,6 +630,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         avisos,
         avisar,
         fecharAviso,
+        nuvem,
+        sessao,
+        recarregarNuvem,
+        importavel: !!importavel,
+        importarLocal,
+        recusarImportacao,
+        sair,
       }}
     >
       {children}

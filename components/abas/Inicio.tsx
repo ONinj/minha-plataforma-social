@@ -1,6 +1,7 @@
 "use client";
 
 import { totalMes, useStore } from "@/lib/store";
+import { formatarCreditos } from "@/lib/custo";
 import { brl } from "@/lib/util";
 import type { IdAba } from "../App";
 import Icone, { Avatar } from "../Icone";
@@ -12,7 +13,8 @@ function saudacao() {
 }
 
 export default function Inicio({ ir, falarComGerente }: { ir: (a: IdAba) => void; falarComGerente: (t: string) => void }) {
-  const { estado, conta, marca, trocarMarca, ocupado } = useStore();
+  const store = useStore();
+  const { estado, conta, marca, trocarMarca, ocupado } = store;
   const agora = new Date();
   const em7 = new Date(agora.getTime() + 7 * 864e5);
   const proximos = estado.agendamentos
@@ -30,7 +32,9 @@ export default function Inicio({ ir, falarComGerente }: { ir: (a: IdAba) => void
     { rotulo: "Esperando aprovação", valor: pendentes, icone: "aprovar", cor: "var(--alerta)", aba: "aprovacoes" as IdAba },
     { rotulo: "Posts nos próximos 7 dias", valor: semana, icone: "calendario", cor: "var(--gemini)", aba: "agendamentos" as IdAba },
     { rotulo: "Vídeos em produção", valor: gerando, icone: "video", cor: "var(--veo)", aba: "midias" as IdAba },
-    { rotulo: "Gasto do perfil no mês", valor: brl(gasto), icone: "carteira", cor: "var(--destaque-2)", aba: "config" as IdAba },
+    store.nuvem
+      ? { rotulo: "Créditos disponíveis", valor: formatarCreditos(store.nuvem.conta.saldo), icone: "carteira", cor: "var(--destaque-2)", aba: "plano" as IdAba }
+      : { rotulo: "Gasto do perfil no mês", valor: brl(gasto), icone: "carteira", cor: "var(--destaque-2)", aba: "config" as IdAba },
   ];
 
   const acoes = [

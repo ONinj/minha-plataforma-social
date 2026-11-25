@@ -327,3 +327,22 @@ label { display: block; font-size: 12.5px; color: var(--texto-2); margin-bottom:
 .microfone.ouvindo { color: white; background: var(--erro); border-color: var(--erro); transition: box-shadow .08s; }
 .microfone-tempo { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 11px; color: var(--erro); font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 600; }
 @keyframes pulsar { 0%, 100% { box-shadow: 0 0 0 0 rgba(244,63,94,.6); } 50% { box-shadow: 0 0 0 8px rgba(244,63,94,0); } }
+
+/* ---------- Login e planos ---------- */
+.tela-login { position: relative; z-index: 1; min-height: 100dvh; display: grid; place-items: center; padding: 16px; }
+.login-caixa { width: min(420px, 100%); background: rgba(17,19,29,.8); backdrop-filter: blur(20px); border: 1px solid var(--borda-forte); border-radius: 20px; padding: 28px; box-shadow: var(--sombra); }
+.planos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.plano { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 18px; border-radius: 16px; background: var(--painel); border: 1px solid var(--borda); }
+.plano.atual { border-color: rgba(139,92,246,.7); box-shadow: 0 0 0 1px rgba(139,92,246,.4), 0 10px 40px -20px rgba(139,92,246,.9); }
+.plano.destaque::before { content: "Mais escolhido"; position: absolute; top: -10px; left: 18px; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 20px; background: var(--gradiente); color: white; }
+.plano .preco { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; }
+.plano .preco small { font-size: 13px; color: var(--texto-3); font-weight: 500; }
+.plano ul { margin: 0; padding-left: 18px; color: var(--texto-2); font-size: 13px; line-height: 1.7; }
+.plano li.nao { color: var(--texto-3); text-decoration: line-through; }
+.trava { display: inline-grid; place-items: center; margin-left: auto; color: var(--texto-3); }
+.extrato td, .extrato th { padding: 8px 10px; border-bottom: 1px solid var(--borda); font-size: 13px; text-align: left; }
+.extrato { width: 100%; border-collapse: collapse; }
+.extrato .mais { color: var(--ok); }
+.extrato .menos { color: var(--texto-2); }
+@media (max-width: 1100px) { .planos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .planos { grid-template-columns: 1fr; } }

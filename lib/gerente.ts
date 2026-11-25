@@ -5,7 +5,8 @@ import type { useStore } from "./store";
 import { chamarClaude, custoEstimadoVideo, gerarImagem, iniciarVideo } from "./servicos";
 import type { Aprovacao, MensagemClaude, Midia, TipoConteudo } from "./tipos";
 import { mensagemDePerfil, textoDoPerfil } from "./perfil";
-import { agoraISO, blobParaBase64, brl, novoId, reduzirImagem } from "./util";
+import { textoCusto } from "./custo";
+import { agoraISO, blobParaBase64, novoId, reduzirImagem } from "./util";
 
 type Store = ReturnType<typeof useStore>;
 
@@ -246,9 +247,9 @@ async function executar(
           if (problema) return erro(problema);
         }
         if (config.confirmarVideos) {
-          const custo = custoEstimadoVideo(config, provedor) * config.cambio;
+          const custo = textoCusto(custoEstimadoVideo(config, provedor), config.cambio);
           const aceito = await interacoes.confirmar(
-            `O gerente quer gerar um vídeo no ${provedor === "veo" ? "Veo" : "Seedance"}:\n\n"${String(entrada.titulo)}"\n\nCusto estimado: ${brl(custo)}. Autorizar?`,
+            `O gerente quer gerar um vídeo no ${provedor === "veo" ? "Veo" : "Seedance"}:\n\n"${String(entrada.titulo)}"\n\nCusto estimado: ${custo}. Autorizar?`,
           );
           if (!aceito) return erro("O usuário não autorizou a geração deste vídeo. Pergunte como ele prefere seguir.");
         }
@@ -410,6 +411,7 @@ export async function rodarGerente(
         messages: chatGerente,
         tools: FERRAMENTAS,
         effort: config.esforcoGerente,
+        uso: "Gerente",
       });
     } catch (e) {
       // Se falhou logo na primeira chamada, desfaz a mensagem enviada para a conversa

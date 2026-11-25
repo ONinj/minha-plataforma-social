@@ -12,7 +12,13 @@ Ferramentas:
 - **Mídias:** biblioteca com todas as imagens e vídeos (dá para enviar os seus também).
 - **Gasto estimado do mês** em reais, no canto da tela, e confirmação antes de gerar qualquer vídeo.
 
-## Como usar
+## Modo local e modo nuvem
+
+- **Modo local** (padrão): cada pessoa cadastra as próprias chaves em Configurações e os dados ficam no navegador.
+- **Modo nuvem**: login, planos com créditos, cobrança pelo Asaas, dados na nuvem e painel de administração.
+  Liga sozinho quando as variáveis do Supabase estão na Vercel. Passo a passo em [docs/CONFIGURAR-NUVEM.md](docs/CONFIGURAR-NUVEM.md).
+
+## Como usar (modo local)
 
 1. Abra a plataforma e vá em **Configurações**.
 2. Cole as chaves:

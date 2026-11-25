@@ -4,11 +4,22 @@ import { useState } from "react";
 import { chamarClaude } from "@/lib/servicos";
 import { useStore } from "@/lib/store";
 import type { Configuracoes as Config } from "@/lib/tipos";
+import { MODO_NUVEM } from "@/lib/nuvem";
 import Icone from "../Icone";
 
 export default function Configuracoes() {
   const store = useStore();
   const { conta, raiz } = store;
+  const r = store.nuvem?.recursos;
+  // No modo nuvem, opções fora do plano aparecem com cadeado e ficam desativadas.
+  const op = (lista: "claude" | "imagem" | "veo", valor: string, nome: string) => {
+    const ok = !r || r[lista].includes(valor);
+    return (
+      <option key={valor} value={valor} disabled={!ok}>
+        {ok ? nome : `🔒 ${nome} (outro plano)`}
+      </option>
+    );
+  };
   const c = conta.config;
   const [mensagem, setMensagem] = useState<string>();
   const [erro, setErro] = useState<string>();
@@ -47,9 +58,10 @@ export default function Configuracoes() {
     <div className="conteudo" style={{ maxWidth: 900 }}>
       <p className="ajuda" style={{ marginTop: 0 }}>
         Estas configurações valem para todos os perfis da conta <b>{conta.nome}</b>.
+        {MODO_NUVEM && " As chaves das IAs ficam no servidor: você só usa os créditos do seu plano."}
       </p>
 
-      <div className="cartao" style={{ marginBottom: 18 }}>
+      {!MODO_NUVEM && <div className="cartao" style={{ marginBottom: 18 }}>
         <h3>
           <Icone nome="raio" /> Chaves das IAs
         </h3>
@@ -74,7 +86,7 @@ export default function Configuracoes() {
         </div>
         {mensagem && <p className="ajuda" style={{ color: "var(--ok)" }}>{mensagem}</p>}
         {erro && <div className="erro-msg">{erro}</div>}
-      </div>
+      </div>}
 
       <div className="cartao" style={{ marginBottom: 18 }}>
         <h3>
@@ -84,9 +96,9 @@ export default function Configuracoes() {
           <div className="campo">
             <label>Claude (gerente e chat)</label>
             <select value={c.modeloClaude} onChange={(e) => mudar("modeloClaude", e.target.value)}>
-              <option value="claude-opus-5-5">Claude Opus 5.5 (melhor qualidade)</option>
-              <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (metade do preço)</option>
-              <option value="claude-haiku-5-5">Claude Haiku 5.5 (bem barato, mais simples)</option>
+              {op("claude", "claude-opus-5-5", "Claude Opus 5.5 (melhor qualidade)")}
+              {op("claude", "claude-sonnet-5-5", "Claude Sonnet 5.5 (metade do preço)")}
+              {op("claude", "claude-haiku-5-5", "Claude Haiku 5.5 (bem barato, mais simples)")}
             </select>
           </div>
           <div className="campo">
@@ -94,29 +106,31 @@ export default function Configuracoes() {
             <select value={c.esforcoGerente} onChange={(e) => mudar("esforcoGerente", e.target.value as Config["esforcoGerente"])}>
               <option value="low">Baixo (mais rápido e barato)</option>
               <option value="medium">Médio (recomendado)</option>
-              <option value="high">Alto (planejamentos mais caprichados)</option>
+              <option value="high" disabled={!!r && r.esforco_max !== "high"}>
+                {!r || r.esforco_max === "high" ? "Alto (planejamentos mais caprichados)" : "🔒 Alto (plano Premium)"}
+              </option>
             </select>
           </div>
           <div className="campo">
             <label>Imagens</label>
             <select value={c.modeloImagemFal} onChange={(e) => mudar("modeloImagemFal", e.target.value)}>
-              <option value="fal-ai/nano-banana-2">Nano Banana 2 (recomendado)</option>
-              <option value="fal-ai/nano-banana-pro">Nano Banana Pro (melhor, mais caro)</option>
-              <option value="fal-ai/nano-banana">Nano Banana (mais barato)</option>
+              {op("imagem", "fal-ai/nano-banana-2", "Nano Banana 2 (recomendado)")}
+              {op("imagem", "fal-ai/nano-banana-pro", "Nano Banana Pro (melhor, mais caro)")}
+              {op("imagem", "fal-ai/nano-banana", "Nano Banana (mais barato)")}
             </select>
           </div>
           <div className="campo">
             <label>Veo</label>
             <select value={c.modeloVeoFal} onChange={(e) => mudar("modeloVeoFal", e.target.value)}>
-              <option value="fal-ai/veo3.1/fast">Veo 3.1 Fast (recomendado)</option>
-              <option value="fal-ai/veo3.1/lite">Veo 3.1 Lite (mais barato)</option>
-              <option value="fal-ai/veo3.1">Veo 3.1 (melhor, mais caro)</option>
+              {op("veo", "fal-ai/veo3.1/fast", "Veo 3.1 Fast (recomendado)")}
+              {op("veo", "fal-ai/veo3.1/lite", "Veo 3.1 Lite (mais barato)")}
+              {op("veo", "fal-ai/veo3.1", "Veo 3.1 (melhor, mais caro)")}
             </select>
           </div>
-          <div className="campo">
+          {!MODO_NUVEM && <div className="campo">
             <label>Seedance (endereço no fal.ai)</label>
             <input type="text" value={c.prefixoSeedance} onChange={(e) => mudar("prefixoSeedance", e.target.value)} />
-          </div>
+          </div>}
           <div className="campo">
             <label>Resolução do Seedance</label>
             <select value={c.resolucaoSeedance} onChange={(e) => mudar("resolucaoSeedance", e.target.value)}>
@@ -136,7 +150,7 @@ export default function Configuracoes() {
           <input type="checkbox" checked={c.confirmarVideos} onChange={(e) => mudar("confirmarVideos", e.target.checked)} />
           Pedir minha confirmação antes de gerar qualquer vídeo
         </label>
-        <div className="grade-2">
+        {!MODO_NUVEM && <div className="grade-2">
           <NumeroCampo rotulo="Orçamento mensal da conta (R$, 0 = sem limite)" valor={c.orcamentoMensal} aoMudar={(v) => mudar("orcamentoMensal", v)} passo="10" />
           <NumeroCampo rotulo="Câmbio (R$ por US$, com IOF)" valor={c.cambio} aoMudar={(v) => mudar("cambio", v)} />
           <NumeroCampo rotulo="Imagem (US$ por imagem)" valor={c.precoImagem} aoMudar={(v) => mudar("precoImagem", v)} />
@@ -144,10 +158,11 @@ export default function Configuracoes() {
           <NumeroCampo rotulo="Duração média Veo (s)" valor={c.segundosVeo} aoMudar={(v) => mudar("segundosVeo", v)} />
           <NumeroCampo rotulo="Seedance (US$ por segundo)" valor={c.precoSeedanceSegundo} aoMudar={(v) => mudar("precoSeedanceSegundo", v)} />
           <NumeroCampo rotulo="Duração média Seedance (s)" valor={c.segundosSeedance} aoMudar={(v) => mudar("segundosSeedance", v)} />
-        </div>
+        </div>}
         <p className="ajuda">
-          O orçamento avisa quando você chega a 80% e a 100% do mês. Os preços são estimativas: confira os valores reais nos
-          painéis da Anthropic e do fal.ai.
+          {MODO_NUVEM
+            ? "O uso das IAs é descontado do seu saldo de créditos (veja o extrato em Plano e créditos). Antes de cada vídeo você vê quantos créditos ele vai usar."
+            : "O orçamento avisa quando você chega a 80% e a 100% do mês. Os preços são estimativas: confira os valores reais nos painéis da Anthropic e do fal.ai."}
         </p>
       </div>
 
@@ -156,8 +171,9 @@ export default function Configuracoes() {
           <Icone nome="pasta" /> Dados
         </h3>
         <p className="ajuda" style={{ marginTop: -4 }}>
-          Tudo fica salvo neste navegador. Baixe um backup de vez em quando (leva contas, perfis, textos, aprovações e
-          calendário, mas não os arquivos de imagem/vídeo nem as chaves).
+          {MODO_NUVEM
+            ? "Tudo fica salvo na nuvem e aparece em qualquer aparelho em que você entrar. O backup é uma cópia extra (sem os arquivos de imagem/vídeo)."
+            : "Tudo fica salvo neste navegador. Baixe um backup de vez em quando (leva contas, perfis, textos, aprovações e calendário, mas não os arquivos de imagem/vídeo nem as chaves)."}
         </p>
         <div className="linha">
           <button className="botao sec" onClick={exportar}>

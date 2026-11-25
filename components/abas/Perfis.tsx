@@ -139,11 +139,12 @@ export default function Perfis() {
             <input type="email" value={conta.email} placeholder="voce@gmail.com" onChange={(e) => editarConta(conta.id, { email: e.target.value })} />
           </div>
         </div>
-        <p className="ajuda">
-          Por enquanto as contas ficam salvas neste navegador, sem senha. O login com Google e os dados na nuvem entram
-          junto com a integração da Meta.
-        </p>
-        {raiz.contas.length > 1 && (
+        {!store.nuvem && (
+          <p className="ajuda">
+            Neste modo as contas ficam salvas só neste navegador, sem senha.
+          </p>
+        )}
+        {!store.nuvem && raiz.contas.length > 1 && (
           <div className="linha" style={{ justifyContent: "flex-end" }}>
             <button
               className="botao perigo"

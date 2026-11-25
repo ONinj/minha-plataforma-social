@@ -29,6 +29,7 @@ export default function ClaudeDireto() {
         system: SYSTEM,
         messages: store.obter().chatClaude,
         effort: "medium",
+        uso: "Chat Claude",
       });
       store.atualizar((e) => ({
         ...e,

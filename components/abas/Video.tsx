@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { custoEstimadoVideo, iniciarVideo } from "@/lib/servicos";
 import { useStore } from "@/lib/store";
-import { brl, formatarData } from "@/lib/util";
+import { textoCusto } from "@/lib/custo";
+import { formatarData } from "@/lib/util";
 import { BotaoBaixar, CartaoMidia, CartaoProducao, MidiaPorId } from "../MidiaView";
 import Microfone from "../Microfone";
 import SeletorMidias from "../SeletorMidias";
@@ -21,13 +22,13 @@ export default function Video({ provedor }: { provedor: "veo" | "seedance" }) {
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string>();
 
-  const custo = custoEstimadoVideo(estado.config, provedor) * estado.config.cambio;
+  const custoTexto = textoCusto(custoEstimadoVideo(estado.config, provedor), estado.config.cambio);
   const videos = estado.midias.filter((m) => m.origem === provedor && m.status !== "gerando");
   const emProducao = estado.midias.filter((m) => m.origem === provedor && m.status === "gerando");
 
   async function gerar() {
     if (!prompt.trim()) return;
-    if (estado.config.confirmarVideos && !window.confirm(`Gerar vídeo no ${nome}? Custo estimado: ${brl(custo)}.`)) return;
+    if (estado.config.confirmarVideos && !window.confirm(`Gerar vídeo no ${nome}? Custo estimado: ${custoTexto}.`)) return;
     setErro(undefined);
     setOcupado(true);
     try {
@@ -126,7 +127,7 @@ export default function Video({ provedor }: { provedor: "veo" | "seedance" }) {
         )}
         <div className="linha">
           <button className="botao" onClick={gerar} disabled={ocupado || !prompt.trim()}>
-            {ocupado ? "Enviando…" : `Gerar vídeo (~${brl(custo)})`}
+            {ocupado ? "Enviando…" : `Gerar vídeo (~${custoTexto})`}
           </button>
         </div>
         {erro && <div className="erro-msg">{erro}</div>}

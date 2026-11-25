@@ -81,7 +81,7 @@ export default function Biblioteca({ mandarParaCentral }: { mandarParaCentral: (
           type: "text",
           text: `Arquivo "${m.titulo}" da pasta "${m.pasta}"${m.duracao ? `, vídeo de ${Math.round(m.duracao)}s (as imagens são quadros do início ao fim)` : ""}. Responda só com JSON: {"descricao": "o que acontece, em 1 ou 2 frases objetivas em português", "tags": "5 a 8 palavras-chave separadas por vírgula"}`,
         });
-        const r = await chamarClaude(store, { messages: [{ role: "user", content: conteudo }], effort: "low", modelo: "claude-haiku-5-5" });
+        const r = await chamarClaude(store, { messages: [{ role: "user", content: conteudo }], effort: "low", modelo: "claude-haiku-5-5", uso: "Descrição da biblioteca" });
         const texto = r.content.map((b) => (b.type === "text" ? b.text : "")).join("");
         const json = JSON.parse(texto.slice(texto.indexOf("{"), texto.lastIndexOf("}") + 1));
         store.atualizarMidia(m.id, { descricao: String(json.descricao ?? ""), tags: String(json.tags ?? "") });
@@ -124,9 +124,9 @@ export default function Biblioteca({ mandarParaCentral }: { mandarParaCentral: (
           <button className="botao sec" onClick={() => inputPasta.current?.click()} disabled={!!progresso}>
             <Icone nome="pasta" tamanho={15} /> Enviar uma pasta inteira
           </button>
-          <button className="botao sec" onClick={() => setDrive(true)} disabled={!!progresso}>
+          {(!store.nuvem || store.nuvem.recursos.drive) && <button className="botao sec" onClick={() => setDrive(true)} disabled={!!progresso}>
             <Icone nome="link" tamanho={15} /> Importar do Google Drive
-          </button>
+          </button>}
           {semDescricao.length > 0 && (
             <button className="botao sec" onClick={descreverComIA} disabled={!!progresso} title="Ajuda o gerente a achar os vídeos certos">
               <Icone nome="central" tamanho={15} /> Descrever com IA ({semDescricao.length})
