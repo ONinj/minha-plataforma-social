@@ -21,7 +21,9 @@ export default function Biblioteca({ mandarParaCentral }: { mandarParaCentral: (
   const itens = store.estado.midias.filter((m) => m.naBiblioteca);
   const [pasta, setPasta] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
-  const [progresso, setProgresso] = useState<string>();
+  // O andamento fica na plataforma (aparece no topo mesmo se você mudar de aba).
+  const progresso = store.tarefa;
+  const setProgresso = store.definirTarefa;
   const [aberto, setAberto] = useState<Midia | null>(null);
   const [drive, setDrive] = useState(false);
   const [selecao, setSelecao] = useState<string[]>([]);
@@ -48,11 +50,13 @@ export default function Biblioteca({ mandarParaCentral }: { mandarParaCentral: (
       return { blob: f as Blob, nome: f.name, pasta: p };
     });
     setProgresso(`Preparando 0 de ${lista.length}...`);
+    store.definirOcupado(true);
     try {
       await adicionarNaBiblioteca(store, lista, (f, t) => setProgresso(`Preparando ${f} de ${t} (extraindo quadros dos vídeos)...`));
       store.avisar(`${lista.length} arquivo(s) adicionados à biblioteca.`, "ok");
     } finally {
       setProgresso(undefined);
+      store.definirOcupado(false);
     }
   }
 
@@ -61,6 +65,7 @@ export default function Biblioteca({ mandarParaCentral }: { mandarParaCentral: (
     if (!lote.length) return;
     if (!window.confirm(`Descrever ${lote.length} item(ns) com o Claude Haiku (bem barato, centavos)? Isso ajuda o gerente a achar os vídeos certos.`)) return;
     let feitos = 0;
+    store.definirOcupado(true);
     for (const m of lote) {
       setProgresso(`Descrevendo ${++feitos} de ${lote.length}: ${m.titulo}...`);
       try {
@@ -85,6 +90,7 @@ export default function Biblioteca({ mandarParaCentral }: { mandarParaCentral: (
       }
     }
     setProgresso(undefined);
+    store.definirOcupado(false);
     store.avisar("Descrições prontas.", "ok");
   }
 
@@ -313,6 +319,7 @@ function ModalDrive({ aoFechar, setProgresso }: { aoFechar: () => void; setProgr
     aoFechar();
     let feitos = 0;
     let falhas = 0;
+    store.definirOcupado(true);
     for (const a of escolhidos) {
       setProgresso(`Importando do Drive ${++feitos} de ${escolhidos.length}: ${a.nome} ${tamanho(a.tamanho)}...`);
       try {
@@ -324,6 +331,7 @@ function ModalDrive({ aoFechar, setProgresso }: { aoFechar: () => void; setProgr
       }
     }
     setProgresso(undefined);
+    store.definirOcupado(false);
     store.avisar(`Importação concluída: ${escolhidos.length - falhas} arquivo(s)${falhas ? `, ${falhas} com erro` : ""}.`, falhas ? "erro" : "ok");
   }
 

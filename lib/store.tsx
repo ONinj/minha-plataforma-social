@@ -44,7 +44,11 @@ type Contexto = {
   removerMarca: (id: string) => void;
   // Trava a troca de perfil enquanto o gerente trabalha
   ocupado: boolean;
+  /** Marca o início (true) ou o fim (false) de um trabalho longo; vários podem correr juntos. */
   definirOcupado: (v: boolean) => void;
+  /** Texto do trabalho em segundo plano (ex.: importação), mostrado no topo em qualquer aba. */
+  tarefa?: string;
+  definirTarefa: (t?: string) => void;
   // Avisos rápidos (toasts)
   avisos: Aviso[];
   avisar: (texto: string, tipo?: Aviso["tipo"]) => void;
@@ -182,7 +186,9 @@ function mudarConta(raiz: Raiz, id: string, fn: (c: Conta) => Conta): Raiz {
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [raiz, setRaiz] = useState<Raiz>(raizInicial);
   const [carregado, setCarregado] = useState(false);
-  const [ocupado, setOcupado] = useState(false);
+  const [trabalhos, setTrabalhos] = useState(0);
+  const [tarefa, definirTarefa] = useState<string>();
+  const definirOcupado = useCallback((v: boolean) => setTrabalhos((n) => Math.max(0, n + (v ? 1 : -1))), []);
   const [avisos, setAvisos] = useState<Aviso[]>([]);
   const ref = useRef<Raiz>(raiz);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -390,8 +396,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         criarMarca,
         editarMarca,
         removerMarca,
-        ocupado,
-        definirOcupado: setOcupado,
+        ocupado: trabalhos > 0,
+        definirOcupado,
+        tarefa,
+        definirTarefa,
         avisos,
         avisar,
         fecharAviso,

@@ -213,6 +213,11 @@ function Plataforma() {
             <h1>{atual.nome}</h1>
           </div>
           <div className="acoes">
+            {store.tarefa && (
+              <button className="etiqueta" style={{ cursor: "pointer", maxWidth: 360, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }} onClick={() => ir("biblioteca")} title={store.tarefa}>
+                <span className="girando" style={{ width: 11, height: 11, borderWidth: 2 }} /> {store.tarefa}
+              </button>
+            )}
             <Notificacoes ir={ir} />
             <button
               className="botao-icone"
