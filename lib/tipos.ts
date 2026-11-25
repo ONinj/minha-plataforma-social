@@ -15,7 +15,7 @@ export type Midia = {
   /** Para vídeos em produção: como consultar o andamento. */
   job?:
     | { provedor: "veo"; operacao: string }
-    | { provedor: "seedance"; endpoint: string; requestId: string };
+    | { provedor: "seedance" | "fal"; endpoint: string; requestId: string };
   /** Link externo, se o arquivo não pôde ser salvo localmente. */
   urlExterna?: string;
 };
@@ -63,6 +63,11 @@ export type Configuracoes = {
   chaveFal: string;
   modeloClaude: string;
   esforcoGerente: "low" | "medium" | "high" | "xhigh" | "max";
+  /** De onde saem as imagens e os vídeos do Veo: fal.ai ou Google direto. */
+  provedorImagem: "fal" | "google";
+  modeloImagemFal: string;
+  provedorVeo: "fal" | "google";
+  modeloVeoFal: string;
   modeloGeminiTexto: string;
   modeloGeminiImagem: string;
   modeloVeo: string;
@@ -100,6 +105,10 @@ export const CONFIG_PADRAO: Configuracoes = {
   chaveFal: "",
   modeloClaude: "claude-opus-5-5",
   esforcoGerente: "medium",
+  provedorImagem: "fal",
+  modeloImagemFal: "fal-ai/nano-banana-2",
+  provedorVeo: "fal",
+  modeloVeoFal: "fal-ai/veo3.1/fast",
   modeloGeminiTexto: "gemini-flash-latest",
   modeloGeminiImagem: "gemini-nano-banana-2.1",
   modeloVeo: "veo-3.1-fast-generate-preview",
@@ -108,8 +117,8 @@ export const CONFIG_PADRAO: Configuracoes = {
   confirmarVideos: true,
   perfilMarca: "",
   cambio: 5.3,
-  precoImagem: 0.067,
-  precoVeoSegundo: 0.12,
+  precoImagem: 0.08,
+  precoVeoSegundo: 0.15,
   segundosVeo: 8,
   precoSeedanceSegundo: 0.47,
   segundosSeedance: 5,

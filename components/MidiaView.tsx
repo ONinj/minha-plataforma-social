@@ -5,7 +5,7 @@ import type { Midia } from "@/lib/tipos";
 import { baixarArquivo } from "@/lib/util";
 
 const NOMES_ORIGEM: Record<Midia["origem"], string> = {
-  gemini: "Gemini",
+  gemini: "Imagem IA",
   veo: "Veo",
   seedance: "Seedance",
   upload: "Upload",

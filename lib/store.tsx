@@ -30,6 +30,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       .then((salvo) => {
         if (salvo) {
           const completo: Estado = { ...ESTADO_INICIAL, ...salvo, config: { ...CONFIG_PADRAO, ...salvo.config } };
+          // Preço antigo padrão do Gemini direto → preço do Nano Banana 2 no fal.ai.
+          if (!("provedorImagem" in (salvo.config ?? {})) && completo.config.precoImagem === 0.067) {
+            completo.config.precoImagem = CONFIG_PADRAO.precoImagem;
+          }
+          if (!("provedorVeo" in (salvo.config ?? {})) && completo.config.precoVeoSegundo === 0.12) {
+            completo.config.precoVeoSegundo = CONFIG_PADRAO.precoVeoSegundo;
+          }
           ref.current = completo;
           setEstado(completo);
         }

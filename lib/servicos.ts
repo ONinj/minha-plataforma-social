@@ -120,11 +120,39 @@ export async function salvarImagensGemini(
   return criadas;
 }
 
+/** Gera uma imagem no fal.ai (Nano Banana 2) e salva na biblioteca. */
+export async function gerarImagemFal(
+  store: Store,
+  params: { prompt: string; proporcao?: string; referencias?: string[]; titulo: string },
+): Promise<{ midias: Midia[]; texto: string }> {
+  const config = store.obter().config;
+  if (!config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
+  const referencias = [];
+  for (const id of params.referencias ?? []) {
+    const inline = await midiaParaInline(store, id, 1536);
+    referencias.push({ mimeType: inline.inlineData.mimeType, base64: inline.inlineData.data });
+  }
+  const r = await postJSON<{ imagens: { mimeType: string; base64: string }[]; texto: string }>(
+    "/api/fal/imagem",
+    { modelo: config.modeloImagemFal, prompt: params.prompt, proporcao: params.proporcao, referencias },
+    hFal(config),
+  );
+  const midias = await salvarImagensGemini(
+    store,
+    r.imagens.map((i) => ({ inlineData: { mimeType: i.mimeType, data: i.base64 } })),
+    { titulo: params.titulo, prompt: params.prompt },
+  );
+  if (!midias.length) throw new Error(r.texto || "O fal.ai não devolveu nenhuma imagem.");
+  return { midias, texto: r.texto };
+}
+
 export async function gerarImagem(
   store: Store,
   params: { prompt: string; proporcao?: string; referencias?: string[]; titulo: string },
 ): Promise<{ midias: Midia[]; texto: string }> {
   const config = store.obter().config;
+  if (config.provedorImagem === "fal") return gerarImagemFal(store, params);
+
   const partes: unknown[] = [];
   for (const ref of params.referencias ?? []) partes.push(await midiaParaInline(store, ref));
   partes.push({ text: params.prompt });
@@ -170,7 +198,15 @@ export async function iniciarVideo(
   }
 
   let job: Midia["job"];
-  if (params.provedor === "veo") {
+  if (params.provedor === "veo" && config.provedorVeo === "fal") {
+    if (!config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
+    const r = await postJSON<{ endpoint: string; requestId: string }>(
+      "/api/fal/video-start",
+      { familia: "veo", modelo: config.modeloVeoFal, prompt: params.prompt, imagem, proporcao: params.proporcao },
+      hFal(config),
+    );
+    job = { provedor: "fal", endpoint: r.endpoint, requestId: r.requestId };
+  } else if (params.provedor === "veo") {
     if (!config.chaveGoogle) throw new Error("Cadastre a chave do Google em Configurações.");
     const r = await postJSON<{ operacao: string }>(
       "/api/veo/start",
@@ -181,9 +217,10 @@ export async function iniciarVideo(
   } else {
     if (!config.chaveFal) throw new Error("Cadastre a chave do fal.ai em Configurações.");
     const r = await postJSON<{ endpoint: string; requestId: string }>(
-      "/api/seedance/start",
+      "/api/fal/video-start",
       {
-        prefixo: config.prefixoSeedance,
+        familia: "seedance",
+        modelo: config.prefixoSeedance,
         prompt: params.prompt,
         imagem,
         resolucao: config.resolucaoSeedance,
@@ -237,7 +274,7 @@ export async function verificarVideos(store: Store) {
         const job = m.job as { endpoint: string; requestId: string };
         const q = new URLSearchParams({ endpoint: job.endpoint, requestId: job.requestId });
         const r = await getJSON<{ pronto: boolean; url?: string; erro?: string }>(
-          `/api/seedance/status?${q}`,
+          `/api/fal/video-status?${q}`,
           hFal(config),
         );
         if (!r.pronto) continue;

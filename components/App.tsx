@@ -16,10 +16,10 @@ import Video from "./abas/Video";
 type IdAba = "central" | "claude" | "gemini" | "veo" | "seedance" | "aprovacoes" | "agendamentos" | "midias" | "config";
 
 const ABAS: { id: IdAba; nome: string; cor: string; descricao: string }[] = [
-  { id: "central", nome: "Central (Gerente)", cor: "var(--destaque)", descricao: "Fale com o Claude: ele coordena o Gemini, o Veo e o Seedance e entrega tudo pronto para aprovar." },
+  { id: "central", nome: "Central (Gerente)", cor: "var(--destaque)", descricao: "Fale com o Claude: ele coordena as imagens (Nano Banana), o Veo e o Seedance e entrega tudo pronto para aprovar." },
   { id: "claude", nome: "Claude", cor: "var(--claude)", descricao: "Conversa direta com o Claude, sem acionar as outras IAs." },
-  { id: "gemini", nome: "Gemini", cor: "var(--gemini)", descricao: "Criativos: cards, stories e imagens de referência." },
-  { id: "veo", nome: "Veo", cor: "var(--veo)", descricao: "Vídeos com o Veo (Google)." },
+  { id: "gemini", nome: "Imagens", cor: "var(--gemini)", descricao: "Criativos com o Nano Banana 2: cards, stories e imagens de referência." },
+  { id: "veo", nome: "Veo", cor: "var(--veo)", descricao: "Vídeos com o Veo 3.1 (Google)." },
   { id: "seedance", nome: "Seedance", cor: "var(--seedance)", descricao: "Vídeos com o Seedance (via fal.ai)." },
   { id: "aprovacoes", nome: "Aprovações", cor: "var(--alerta)", descricao: "Tudo o que o gerente entregou esperando o seu OK." },
   { id: "agendamentos", nome: "Agendamentos", cor: "var(--ok)", descricao: "O seu calendário: o que está a programar, programado e postado." },
@@ -79,7 +79,7 @@ function Plataforma() {
       <nav className="lateral">
         <div className="marca">
           Central Social
-          <small>Claude · Gemini · Veo · Seedance</small>
+          <small>Claude · Nano Banana · Veo · Seedance</small>
         </div>
         {ABAS.map((a, i) => (
           <div key={a.id} style={{ display: "contents" }}>
@@ -91,12 +91,12 @@ function Plataforma() {
             </button>
           </div>
         ))}
-        <div className="gasto" title={g ? `Claude ${brl(g.claude * estado.config.cambio)} · Gemini ${brl(g.gemini * estado.config.cambio)} · Veo ${brl(g.veo * estado.config.cambio)} · Seedance ${brl(g.seedance * estado.config.cambio)}` : ""}>
+        <div className="gasto" title={g ? `Claude ${brl(g.claude * estado.config.cambio)} · Imagens ${brl(g.gemini * estado.config.cambio)} · Veo ${brl(g.veo * estado.config.cambio)} · Seedance ${brl(g.seedance * estado.config.cambio)}` : ""}>
           Gasto estimado no mês
           <strong>{brl(totalUsd * estado.config.cambio)}</strong>
           {g && (
             <div style={{ marginTop: 6, fontSize: 12 }}>
-              Claude {brl(g.claude * estado.config.cambio)} · Gemini {brl(g.gemini * estado.config.cambio)}
+              Claude {brl(g.claude * estado.config.cambio)} · Imagens {brl(g.gemini * estado.config.cambio)}
               <br />
               Veo {brl(g.veo * estado.config.cambio)} · Seedance {brl(g.seedance * estado.config.cambio)}
             </div>

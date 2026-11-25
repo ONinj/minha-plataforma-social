@@ -6,7 +6,7 @@ import Markdown from "./Markdown";
 import { MidiaPorId } from "./MidiaView";
 
 const NOMES_FERRAMENTAS: Record<string, string> = {
-  gerar_imagem: "Pediu uma imagem ao Gemini",
+  gerar_imagem: "Pediu uma imagem (Nano Banana)",
   gerar_video: "Pediu um vídeo",
   enviar_para_aprovacao: "Enviou para aprovação",
   listar_agendamentos: "Consultou o calendário",

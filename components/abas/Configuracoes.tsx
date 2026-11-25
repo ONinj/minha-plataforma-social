@@ -100,11 +100,11 @@ export default function Configuracoes() {
           <input type={mostrar ? "text" : "password"} value={c.chaveAnthropic} onChange={(e) => mudar("chaveAnthropic", e.target.value.trim())} placeholder="sk-ant-..." />
         </div>
         <div className="campo">
-          <label>Google AI Studio (Gemini + Veo) — aistudio.google.com → Get API key</label>
+          <label>Google AI Studio (opcional, só se usar o Google direto) — aistudio.google.com → Get API key</label>
           <input type={mostrar ? "text" : "password"} value={c.chaveGoogle} onChange={(e) => mudar("chaveGoogle", e.target.value.trim())} placeholder="AIza..." />
         </div>
         <div className="campo">
-          <label>fal.ai (Seedance) — fal.ai → Keys</label>
+          <label>fal.ai (imagens Nano Banana 2, Veo e Seedance) — fal.ai → Keys</label>
           <input type={mostrar ? "text" : "password"} value={c.chaveFal} onChange={(e) => mudar("chaveFal", e.target.value.trim())} />
         </div>
         <div className="linha">
@@ -137,6 +137,36 @@ export default function Configuracoes() {
         <h3>Modelos</h3>
         <div className="grade-2">
           <div className="campo">
+            <label>Imagens saem de</label>
+            <select value={c.provedorImagem} onChange={(e) => mudar("provedorImagem", e.target.value as Config["provedorImagem"])}>
+              <option value="fal">fal.ai (recomendado)</option>
+              <option value="google">Google direto (precisa de faturamento no Google)</option>
+            </select>
+          </div>
+          <div className="campo">
+            <label>Modelo de imagem no fal.ai</label>
+            <select value={c.modeloImagemFal} onChange={(e) => mudar("modeloImagemFal", e.target.value)}>
+              <option value="fal-ai/nano-banana-2">Nano Banana 2 (recomendado)</option>
+              <option value="fal-ai/nano-banana-pro">Nano Banana Pro (melhor, mais caro)</option>
+              <option value="fal-ai/nano-banana">Nano Banana (mais barato)</option>
+            </select>
+          </div>
+          <div className="campo">
+            <label>Veo sai de</label>
+            <select value={c.provedorVeo} onChange={(e) => mudar("provedorVeo", e.target.value as Config["provedorVeo"])}>
+              <option value="fal">fal.ai (recomendado)</option>
+              <option value="google">Google direto (precisa de faturamento no Google)</option>
+            </select>
+          </div>
+          <div className="campo">
+            <label>Modelo do Veo no fal.ai</label>
+            <select value={c.modeloVeoFal} onChange={(e) => mudar("modeloVeoFal", e.target.value)}>
+              <option value="fal-ai/veo3.1/fast">Veo 3.1 Fast (recomendado)</option>
+              <option value="fal-ai/veo3.1/lite">Veo 3.1 Lite (mais barato)</option>
+              <option value="fal-ai/veo3.1">Veo 3.1 (melhor, mais caro)</option>
+            </select>
+          </div>
+          <div className="campo">
             <label>Claude</label>
             <select value={c.modeloClaude} onChange={(e) => mudar("modeloClaude", e.target.value)}>
               <option value="claude-opus-5-5">Claude Opus 5.5 (melhor qualidade)</option>
@@ -153,17 +183,17 @@ export default function Configuracoes() {
             </select>
           </div>
           <div className="campo">
-            <label>Gemini — texto</label>
+            <label>Google direto — Gemini texto</label>
             <input type="text" list="m-texto" value={c.modeloGeminiTexto} onChange={(e) => mudar("modeloGeminiTexto", e.target.value)} />
             <datalist id="m-texto">{listaGoogle((m) => m.metodos.includes("generateContent"))}</datalist>
           </div>
           <div className="campo">
-            <label>Gemini — imagem</label>
+            <label>Google direto — Gemini imagem</label>
             <input type="text" list="m-imagem" value={c.modeloGeminiImagem} onChange={(e) => mudar("modeloGeminiImagem", e.target.value)} />
             <datalist id="m-imagem">{listaGoogle((m) => m.metodos.includes("generateContent"))}</datalist>
           </div>
           <div className="campo">
-            <label>Veo</label>
+            <label>Google direto — Veo</label>
             <input type="text" list="m-veo" value={c.modeloVeo} onChange={(e) => mudar("modeloVeo", e.target.value)} />
             <datalist id="m-veo">{listaGoogle((m) => m.metodos.includes("predictLongRunning"))}</datalist>
           </div>
@@ -193,7 +223,7 @@ export default function Configuracoes() {
         </p>
         <div className="grade-2">
           <NumeroCampo rotulo="Câmbio (R$ por US$, com IOF)" valor={c.cambio} aoMudar={(v) => mudar("cambio", v)} />
-          <NumeroCampo rotulo="Imagem Gemini (US$ por imagem)" valor={c.precoImagem} aoMudar={(v) => mudar("precoImagem", v)} />
+          <NumeroCampo rotulo="Imagem (US$ por imagem)" valor={c.precoImagem} aoMudar={(v) => mudar("precoImagem", v)} />
           <NumeroCampo rotulo="Veo (US$ por segundo)" valor={c.precoVeoSegundo} aoMudar={(v) => mudar("precoVeoSegundo", v)} />
           <NumeroCampo rotulo="Duração média Veo (s)" valor={c.segundosVeo} aoMudar={(v) => mudar("segundosVeo", v)} />
           <NumeroCampo rotulo="Seedance (US$ por segundo)" valor={c.precoSeedanceSegundo} aoMudar={(v) => mudar("precoSeedanceSegundo", v)} />

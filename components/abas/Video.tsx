@@ -52,7 +52,7 @@ export default function Video({ provedor }: { provedor: "veo" | "seedance" }) {
         <h3>Novo vídeo no {nome}</h3>
         <p className="ajuda">
           {provedor === "veo"
-            ? "Vídeos curtos (cerca de 8 s) com áudio. É o mais barato: use como padrão."
+            ? "Vídeos curtos (até 8 s) com áudio. É o mais barato: use como padrão."
             : "Mais caro, ótimo para cenas cinematográficas e pessoas realistas. Com imagem inicial, a proporção segue a da imagem."}{" "}
           O vídeo leva alguns minutos e aparece abaixo quando ficar pronto.
         </p>

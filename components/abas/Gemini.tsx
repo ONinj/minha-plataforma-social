@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { chamarGemini, midiaParaInline, salvarImagensGemini } from "@/lib/servicos";
+import { chamarGemini, gerarImagemFal, midiaParaInline, salvarImagensGemini } from "@/lib/servicos";
 import { useStore } from "@/lib/store";
 import type { MensagemGemini, ParteGemini } from "@/lib/tipos";
 import Markdown from "../Markdown";
@@ -21,8 +21,12 @@ export default function Gemini() {
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string>();
   const fim = useRef<HTMLDivElement>(null);
+  const viaFal = estado.config.provedorImagem === "fal";
+  const gerandoImagem = viaFal || modoImagem;
 
-  useEffect(() => fim.current?.scrollIntoView({ behavior: "smooth" }), [estado.chatGemini.length, ocupado]);
+  useEffect(() => {
+    fim.current?.scrollIntoView({ behavior: "smooth" });
+  }, [estado.chatGemini.length, ocupado]);
 
   async function enviar() {
     const t = texto.trim();
@@ -35,6 +39,26 @@ export default function Gemini() {
     store.atualizar((e) => ({ ...e, chatGemini: [...e.chatGemini, { papel: "user", partes: partesUsuario }] }));
 
     try {
+      if (viaFal) {
+        // Sem anexos, usa a última imagem criada como base para ajustes ("deixe o fundo azul").
+        let refs = partesUsuario.filter((p): p is { midiaId: string } => "midiaId" in p).map((p) => p.midiaId);
+        if (!refs.length) {
+          const anterior = [...store.obter().chatGemini].reverse().find((m) => m.papel === "model");
+          const ultimaImagem = anterior?.partes.filter((p): p is { midiaId: string } => "midiaId" in p).pop();
+          if (ultimaImagem && !/^\s*nova\b/i.test(t)) refs = [ultimaImagem.midiaId];
+        }
+        const { midias, texto: obs } = await gerarImagemFal(store, {
+          prompt: t,
+          proporcao,
+          referencias: refs,
+          titulo: t.slice(0, 50),
+        });
+        const partesModelo: ParteGemini[] = [];
+        if (obs) partesModelo.push({ texto: obs });
+        midias.forEach((m) => partesModelo.push({ midiaId: m.id }));
+        store.atualizar((e) => ({ ...e, chatGemini: [...e.chatGemini, { papel: "model", partes: partesModelo }] }));
+        return;
+      }
       const config = store.obter().config;
       // Manda só as últimas mensagens para a requisição não ficar pesada.
       const historico = store.obter().chatGemini.slice(-8);
@@ -74,11 +98,20 @@ export default function Gemini() {
       <div className="mensagens">
         {estado.chatGemini.length === 0 && (
           <div className="cartao" style={{ maxWidth: 720 }}>
-            <h3>Gemini: criativos</h3>
-            <p className="ajuda">
-              Com <b>Modo imagem</b> ligado, o Gemini cria cards, stories e imagens de referência (salvas em Mídias).
-              Você pode anexar imagens da biblioteca para ele manter o estilo ou editar. Desligado, é um chat de texto.
-            </p>
+            <h3>Imagens: criativos</h3>
+            {viaFal ? (
+              <p className="ajuda">
+                Descreva a imagem e o <b>Nano Banana 2</b> (pelo fal.ai) cria cards, stories e imagens de referência,
+                salvas em Mídias. Para ajustar, é só pedir a mudança na mensagem seguinte: ele edita a última imagem.
+                Para começar uma imagem do zero, comece a mensagem com <b>“nova”</b> ou clique em Nova conversa. Você
+                também pode anexar imagens da biblioteca como referência.
+              </p>
+            ) : (
+              <p className="ajuda">
+                Com <b>Modo imagem</b> ligado, o Gemini cria cards, stories e imagens de referência (salvas em Mídias).
+                Você pode anexar imagens da biblioteca para ele manter o estilo ou editar. Desligado, é um chat de texto.
+              </p>
+            )}
           </div>
         )}
         {estado.chatGemini.map((m: MensagemGemini, i) => (
@@ -102,7 +135,7 @@ export default function Gemini() {
         ))}
         {ocupado && (
           <div className="etapa">
-            <div className="girando" /> Gemini criando...
+            <div className="girando" /> {viaFal ? "Nano Banana criando..." : "Gemini criando..."}
           </div>
         )}
         {erro && <div className="erro-msg">{erro}</div>}
@@ -121,10 +154,12 @@ export default function Gemini() {
       )}
       <div className="entrada" style={{ flexWrap: "wrap" }}>
         <div className="linha" style={{ width: "100%" }}>
-          <label className="linha" style={{ margin: 0, cursor: "pointer" }}>
-            <input type="checkbox" checked={modoImagem} onChange={(e) => setModoImagem(e.target.checked)} /> Modo imagem
-          </label>
-          {modoImagem && (
+          {!viaFal && (
+            <label className="linha" style={{ margin: 0, cursor: "pointer" }}>
+              <input type="checkbox" checked={modoImagem} onChange={(e) => setModoImagem(e.target.checked)} /> Modo imagem
+            </label>
+          )}
+          {gerandoImagem && (
             <select value={proporcao} onChange={(e) => setProporcao(e.target.value)} style={{ width: "auto" }}>
               {PROPORCOES.map((p) => (
                 <option key={p}>{p}</option>
@@ -147,7 +182,7 @@ export default function Gemini() {
         <textarea
           value={texto}
           style={{ flex: 1 }}
-          placeholder={modoImagem ? "Descreva a imagem que você quer…" : "Converse com o Gemini…"}
+          placeholder={gerandoImagem ? "Descreva a imagem que você quer, ou o ajuste na última…" : "Converse com o Gemini…"}
           onChange={(e) => setTexto(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
