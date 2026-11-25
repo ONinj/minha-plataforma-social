@@ -24,6 +24,7 @@ export async function GET(req: Request) {
       planos: planos.map((p) => ({ ...p, preco: Number(p.preco), creditos_mensais: Number(p.creditos_mensais) })),
       whatsapp: process.env.NEXT_PUBLIC_WHATSAPP ?? "",
       cobranca: !!process.env.ASAAS_API_KEY,
+      instagramConfigurado: !!(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET && process.env.CHAVE_CRIPTO),
     });
   } catch (e) {
     return responderErro(e);

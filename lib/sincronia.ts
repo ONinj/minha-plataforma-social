@@ -30,6 +30,7 @@ export type InfoNuvem = {
     biblioteca: boolean;
     drive: boolean;
     esforco_max: string;
+    instagram?: boolean;
   };
   cambio: number;
   precos: {
@@ -43,6 +44,7 @@ export type InfoNuvem = {
   planos: { id: string; nome: string; preco: number; creditos_mensais: number; recursos: InfoNuvem["recursos"] }[];
   whatsapp: string;
   cobranca: boolean;
+  instagramConfigurado: boolean;
 };
 
 const PREFS: (keyof Configuracoes)[] = [
@@ -89,7 +91,12 @@ export async function carregarDaNuvem(contaPedida?: string): Promise<{ raiz: Rai
   const { perfis } = await api<{ perfis: LinhaPerfil[] }>("/api/perfis");
   const marcas = perfis.filter((p) => !p.apagado).map((p) => p.dados);
   const ultimo = perfis.reduce((m, p) => Math.max(m, p.em), 0);
-  if (!marcas.length) marcas.push(marcaVazia("Meu primeiro perfil"));
+  if (!marcas.length) {
+    // Conta nova: cria o primeiro perfil já salvo na nuvem (o id precisa ser o mesmo em toda visita).
+    const primeira = marcaVazia("Meu primeiro perfil");
+    await api("/api/perfis", { metodo: "PUT", corpo: { id: primeira.id, dados: primeira } }).catch(() => {});
+    marcas.push(primeira);
+  }
   const salvaAtiva = typeof localStorage !== "undefined" ? localStorage.getItem(`perfil-ativo:${info.conta.id}`) : null;
   const contas: Conta[] = info.contas.map((c, i) => ({
     id: c.id,

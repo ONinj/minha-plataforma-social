@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { verificarVideos } from "@/lib/servicos";
 import { StoreProvider, totalContaMes, totalMes, useStore } from "@/lib/store";
 import { formatarCreditos } from "@/lib/custo";
+import { atualizarConexoes, sincronizarPublicacoes } from "@/lib/instagram";
 import { MODO_NUVEM } from "@/lib/nuvem";
 import { brl } from "@/lib/util";
 import Admin from "./abas/Admin";
@@ -120,6 +121,35 @@ function Plataforma() {
     window.addEventListener("beforeunload", aviso);
     return () => window.removeEventListener("beforeunload", aviso);
   }, [store.ocupado]);
+
+  // Volta do login do Instagram (?instagram=ok|erro).
+  useEffect(() => {
+    if (!store.nuvem) return;
+    const q = new URLSearchParams(window.location.search);
+    const r = q.get("instagram");
+    if (!r) return;
+    window.history.replaceState(null, "", window.location.pathname);
+    if (r === "ok") {
+      store.avisar(`Instagram @${q.get("usuario") ?? ""} conectado!`, "ok");
+      const perfil = q.get("perfil");
+      if (perfil && conta.marcas.some((m) => m.id === perfil)) store.trocarMarca(perfil);
+      void atualizarConexoes();
+    } else store.avisar(`Não foi possível conectar o Instagram: ${q.get("msg") ?? "erro"}`, "erro");
+    setAba("perfis");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!store.nuvem]);
+
+  // Atualiza a situação das publicações automáticas do perfil ativo (a cada minuto).
+  const temPublicacaoPendente = estado.agendamentos.some(
+    (a) => a.publicarAuto && a.publicacao && ["agendada", "publicando"].includes(a.publicacao.status),
+  );
+  useEffect(() => {
+    if (!store.nuvem || !temPublicacaoPendente) return;
+    const tick = () => sincronizarPublicacoes(storeRef.current).catch(() => {});
+    tick();
+    const t = setInterval(tick, 30000);
+    return () => clearInterval(t);
+  }, [temPublicacaoPendente, marca.id, !!store.nuvem]);
 
   // Mostra no título da aba do navegador quantos vídeos estão sendo feitos.
   const qtdGerando = conta.marcas.reduce((n, m) => n + m.midias.filter((x) => x.status === "gerando").length, 0);

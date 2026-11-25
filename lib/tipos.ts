@@ -76,6 +76,9 @@ export type Agendamento = {
   status: StatusAgendamento;
   criadoEm: string;
   atualizadoEm: string;
+  /** Publicação automática no Instagram (modo nuvem). */
+  publicarAuto?: boolean;
+  publicacao?: { status: "agendada" | "publicando" | "publicada" | "erro" | "cancelada"; permalink?: string | null; erro?: string | null };
 };
 
 export type ParteGemini = { texto: string } | { midiaId: string };

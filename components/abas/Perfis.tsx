@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { atualizarConexoes, conectarInstagram, desconectarInstagram, useInstagram } from "@/lib/instagram";
 import { useStore } from "@/lib/store";
 import { CORES, type Marca } from "@/lib/tipos";
 import Icone, { Avatar } from "../Icone";
@@ -84,19 +85,21 @@ export default function Perfis() {
         </div>
       </div>
 
+      {store.nuvem && <CartaoInstagram />}
+
       <div className="cartao" style={{ marginBottom: 18 }}>
         <h3>
-          <Icone nome="link" /> Redes conectadas
+          <Icone nome="link" /> Contas das redes
         </h3>
         <p className="ajuda" style={{ marginTop: -4 }}>
-          A publicação automática pela API da Meta vem numa próxima etapa. Por enquanto, anote as contas de cada rede.
+          Anote as contas de cada rede (o gerente usa essas informações).
         </p>
         <div className="grade-2">
           {REDES_CONEXAO.map((r) => (
             <div key={r.chave} className="campo">
               <label className="linha" style={{ gap: 6 }}>
                 {r.chave === "instagram" && <Icone nome="instagram" tamanho={14} />} {r.nome}
-                <span className="etiqueta" style={{ marginLeft: "auto" }}>publicação automática em breve</span>
+
               </label>
               <input
                 type="text"
@@ -158,6 +161,71 @@ export default function Perfis() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function CartaoInstagram() {
+  const store = useStore();
+  const ig = useInstagram(store);
+  const [ocupado, setOcupado] = useState(false);
+  return (
+    <div className="cartao" style={{ marginBottom: 18, borderColor: ig.conexao ? "rgba(34,197,94,.4)" : undefined }}>
+      <h3>
+        <Icone nome="instagram" /> Publicação automática no Instagram
+      </h3>
+      {!ig.noPlano ? (
+        <div className="linha" style={{ justifyContent: "space-between" }}>
+          <span className="ajuda">🔒 Publicar sozinho no Instagram na hora marcada faz parte do plano Premium.</span>
+          <span className="ajuda">Veja em Plano e créditos.</span>
+        </div>
+      ) : !ig.configurado ? (
+        <p className="ajuda">A conexão com o Instagram ainda está sendo configurada pela equipe da plataforma.</p>
+      ) : ig.conexao ? (
+        <div className="linha" style={{ justifyContent: "space-between" }}>
+          <span>
+            ✅ Conectado como <b>@{ig.conexao.username}</b>
+            <span className="ajuda" style={{ display: "block", fontSize: 12 }}>
+              A conexão se renova sozinha. No calendário, ative &quot;Publicar automaticamente&quot; em cada post.
+            </span>
+          </span>
+          <button
+            className="botao perigo peq"
+            disabled={ocupado}
+            onClick={async () => {
+              if (!window.confirm("Desconectar o Instagram deste perfil? As publicações agendadas não vão sair.")) return;
+              setOcupado(true);
+              await desconectarInstagram(store.marca.id).catch((e) => store.avisar(String(e.message), "erro"));
+              await atualizarConexoes();
+              setOcupado(false);
+            }}
+          >
+            Desconectar
+          </button>
+        </div>
+      ) : (
+        <>
+          <p className="ajuda" style={{ marginTop: -4 }}>
+            Conecte a conta do Instagram deste perfil para publicar sozinho na data marcada (posts, carrosséis, reels e stories).
+            A conta precisa ser <b>profissional</b> (Empresa ou Criador de conteúdo).
+          </p>
+          <button
+            className="botao"
+            disabled={ocupado}
+            onClick={async () => {
+              setOcupado(true);
+              try {
+                await conectarInstagram(store.marca.id);
+              } catch (e) {
+                store.avisar(e instanceof Error ? e.message : String(e), "erro");
+                setOcupado(false);
+              }
+            }}
+          >
+            <Icone nome="instagram" /> Conectar Instagram
+          </button>
+        </>
+      )}
     </div>
   );
 }

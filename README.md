@@ -16,7 +16,7 @@ Ferramentas:
 
 - **Modo local** (padrão): cada pessoa cadastra as próprias chaves em Configurações e os dados ficam no navegador.
 - **Modo nuvem**: login, planos com créditos, cobrança pelo Asaas, dados na nuvem e painel de administração.
-  Liga sozinho quando as variáveis do Supabase estão na Vercel. Passo a passo em [docs/CONFIGURAR-NUVEM.md](docs/CONFIGURAR-NUVEM.md).
+  Liga sozinho quando as variáveis do Supabase estão na Vercel. Passo a passo em [docs/CONFIGURAR-NUVEM.md](docs/CONFIGURAR-NUVEM.md). Publicação automática no Instagram: [docs/CONFIGURAR-INSTAGRAM.md](docs/CONFIGURAR-INSTAGRAM.md).
 
 ## Como usar (modo local)
 

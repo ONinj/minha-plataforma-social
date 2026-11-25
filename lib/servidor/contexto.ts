@@ -70,6 +70,7 @@ export type Recursos = {
   biblioteca: boolean;
   drive: boolean;
   esforco_max: "low" | "medium" | "high";
+  instagram?: boolean;
 };
 
 export type Precos = {

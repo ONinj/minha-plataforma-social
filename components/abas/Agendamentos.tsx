@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { REDES, type Agendamento, type StatusAgendamento, type TipoConteudo } from "@/lib/tipos";
 import { agoraISO, formatarData, novoId } from "@/lib/util";
+import { agendarNoInstagram, cancelarNoInstagram, sincronizarPublicacoes, useInstagram } from "@/lib/instagram";
 import Icone from "../Icone";
 import { BotaoBaixar, CartaoMidia } from "../MidiaView";
 
@@ -23,6 +24,12 @@ function chaveDia(d: Date) {
 export default function Agendamentos() {
   const store = useStore();
   const { estado } = store;
+
+  // Ao abrir o calendário, traz na hora a situação das publicações automáticas.
+  useEffect(() => {
+    if (store.nuvem && estado.agendamentos.some((a) => a.publicarAuto)) sincronizarPublicacoes(store).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [mes, setMes] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -148,7 +155,10 @@ export default function Agendamentos() {
             <div key={a.id} className="cartao" style={{ padding: 14 }}>
               <div className="linha" style={{ justifyContent: "space-between", cursor: "pointer" }} onClick={() => setAberto(a)}>
                 <b>{a.titulo}</b>
-                <span className={`status-${a.status}`}>{NOMES_STATUS_AGD[a.status]}</span>
+                <span className="linha" style={{ gap: 8 }}>
+                  <SeloInstagram a={a} />
+                  <span className={`status-${a.status}`}>{NOMES_STATUS_AGD[a.status]}</span>
+                </span>
               </div>
               <div className="linha" style={{ justifyContent: "space-between", marginTop: 6 }}>
                 <span className="ajuda">
@@ -206,6 +216,12 @@ function ModalAgendamento({ item, aoFechar }: { item: Agendamento | null; aoFech
         : [...e.agendamentos, { ...dados, id: novoId("agd"), midias: [], criadoEm: agoraISO() }],
     }));
     aoFechar();
+    if (item?.publicarAuto && item.publicacao?.status !== "publicada" && item.publicacao?.status !== "cancelada") {
+      const novo = { ...item, ...dados };
+      agendarNoInstagram(store, novo)
+        .then(() => store.avisar("Publicação no Instagram atualizada.", "ok"))
+        .catch((e) => store.avisar(`Instagram: ${e instanceof Error ? e.message : e}`, "erro"));
+    }
   }
 
   function excluir() {
@@ -235,6 +251,8 @@ function ModalAgendamento({ item, aoFechar }: { item: Agendamento | null; aoFech
             ))}
           </div>
         </div>
+
+        {item && <PainelInstagram item={item} aoFechar={aoFechar} />}
 
         {midias.length > 0 && (
           <div className="grade-midias" style={{ marginBottom: 14 }}>
@@ -307,6 +325,99 @@ function ModalAgendamento({ item, aoFechar }: { item: Agendamento | null; aoFech
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SeloInstagram({ a }: { a: Agendamento }) {
+  const p = a.publicacao;
+  if (!a.publicarAuto || !p || p.status === "cancelada") return null;
+  if (p.status === "publicada")
+    return p.permalink ? (
+      <a className="etiqueta" href={p.permalink} target="_blank" rel="noreferrer" style={{ color: "var(--ok)" }}>
+        📸 Publicado ↗
+      </a>
+    ) : (
+      <span className="etiqueta" style={{ color: "var(--ok)" }}>📸 Publicado</span>
+    );
+  if (p.status === "erro") return <span className="etiqueta" style={{ color: "var(--erro)" }} title={p.erro ?? ""}>📸 Erro</span>;
+  if (p.status === "publicando") return <span className="etiqueta">📸 Publicando…</span>;
+  return <span className="etiqueta" style={{ color: "var(--gemini)" }}>📸 Automático</span>;
+}
+
+function PainelInstagram({ item, aoFechar }: { item: Agendamento; aoFechar: () => void }) {
+  const store = useStore();
+  const ig = useInstagram(store);
+  const [trabalhando, setTrabalhando] = useState(false);
+  if (!store.nuvem) return null;
+  const p = item.publicacao;
+  const ativo = item.publicarAuto && p && p.status !== "cancelada";
+
+  async function fazer(fn: () => Promise<unknown>, ok: string) {
+    setTrabalhando(true);
+    try {
+      await fn();
+      store.avisar(ok, "ok");
+      aoFechar();
+    } catch (e) {
+      store.avisar(`Instagram: ${e instanceof Error ? e.message : e}`, "erro");
+    } finally {
+      setTrabalhando(false);
+    }
+  }
+
+  return (
+    <div className="cartao" style={{ marginBottom: 14, padding: 14 }}>
+      <div className="linha" style={{ justifyContent: "space-between" }}>
+        <b className="linha" style={{ gap: 6 }}>
+          <Icone nome="instagram" tamanho={16} /> Instagram
+        </b>
+        <SeloInstagram a={item} />
+      </div>
+      {!ig.noPlano ? (
+        <p className="ajuda" style={{ marginBottom: 0 }}>🔒 Publicação automática a partir do plano Premium.</p>
+      ) : !ig.conexao ? (
+        <p className="ajuda" style={{ marginBottom: 0 }}>Conecte o Instagram deste perfil em Perfis e redes para publicar sozinho.</p>
+      ) : p?.status === "publicada" ? (
+        <p className="ajuda" style={{ marginBottom: 0 }}>
+          Publicado em @{ig.conexao.username}.{" "}
+          {p.permalink && (
+            <a href={p.permalink} target="_blank" rel="noreferrer">
+              Ver no Instagram
+            </a>
+          )}
+        </p>
+      ) : (
+        <>
+          {p?.status === "erro" && <div className="erro-msg">{p.erro}</div>}
+          <p className="ajuda">
+            {ativo
+              ? `Vai sair sozinho em @${ig.conexao.username} na data e hora marcadas.`
+              : `Publique sozinho em @${ig.conexao.username} na data marcada (as imagens viram JPEG automaticamente).`}
+          </p>
+          <div className="linha" style={{ gap: 8 }}>
+            {!ativo || p?.status === "erro" ? (
+              <button className="botao peq" disabled={trabalhando || !item.midias.length} onClick={() => fazer(() => agendarNoInstagram(store, item), "Agendado no Instagram.")}>
+                {trabalhando ? "Preparando..." : p?.status === "erro" ? "Tentar de novo" : "Publicar automaticamente na data"}
+              </button>
+            ) : (
+              <button className="botao sec peq" disabled={trabalhando} onClick={() => fazer(() => cancelarNoInstagram(store, item.id), "Publicação automática cancelada.")}>
+                Cancelar publicação automática
+              </button>
+            )}
+            <button
+              className="botao sec peq"
+              disabled={trabalhando || !item.midias.length}
+              onClick={() => {
+                if (window.confirm(`Publicar agora em @${ig.conexao!.username}?`)) fazer(() => agendarNoInstagram(store, item, { agora: true }), "Enviado para o Instagram.");
+              }}
+            >
+              Publicar agora
+            </button>
+          </div>
+          {!item.midias.length && <p className="ajuda" style={{ fontSize: 12 }}>Este item não tem imagem nem vídeo.</p>}
+        </>
+      )}
     </div>
   );
 }

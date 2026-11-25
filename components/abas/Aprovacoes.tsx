@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { agendarNoInstagram, useInstagram } from "@/lib/instagram";
 import { useStore } from "@/lib/store";
 import { REDES, type Agendamento, type Aprovacao } from "@/lib/tipos";
 import { agoraISO, formatarData, novoId } from "@/lib/util";
@@ -62,6 +63,8 @@ function ItemAprovacao({ item, falarComGerente }: { item: Aprovacao; falarComGer
   const [redes, setRedes] = useState<string[]>(item.redes);
   const [feedback, setFeedback] = useState("");
   const [pedindoAjuste, setPedindoAjuste] = useState(false);
+  const ig = useInstagram(store);
+  const [publicarAuto, setPublicarAuto] = useState(true);
   const midias = item.midias.map((id) => store.estado.midias.find((m) => m.id === id)).filter(Boolean);
   const aindaGerando = midias.some((m) => m!.status === "gerando");
   const ePlanejamento = item.tipo === "planejamento";
@@ -93,6 +96,12 @@ function ItemAprovacao({ item, falarComGerente }: { item: Aprovacao; falarComGer
       atualizadoEm: agoraISO(),
     };
     store.atualizar((e) => ({ ...e, agendamentos: [...e.agendamentos, agendamento] }));
+    if (ig.conexao && publicarAuto && agendamento.midias.length) {
+      store.avisar("Preparando a publicação automática no Instagram...", "info");
+      agendarNoInstagram(store, agendamento)
+        .then(() => store.avisar(`Agendado no Instagram para ${formatarData(agendamento.data)}.`, "ok"))
+        .catch((e) => store.avisar(`Não consegui agendar no Instagram: ${e instanceof Error ? e.message : e}`, "erro"));
+    }
   }
 
   function enviarAjuste() {
@@ -172,6 +181,12 @@ function ItemAprovacao({ item, falarComGerente }: { item: Aprovacao; falarComGer
               <label>O que precisa mudar?</label>
               <textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Ex.: troque a cor do fundo para azul e deixe a legenda mais curta" />
             </div>
+          )}
+          {ig.conexao && !ePlanejamento && midias.length > 0 && (
+            <label className="linha" style={{ margin: 0, cursor: "pointer" }}>
+              <input type="checkbox" checked={publicarAuto} onChange={(e) => setPublicarAuto(e.target.checked)} />
+              Publicar automaticamente no Instagram (@{ig.conexao.username}) na data marcada
+            </label>
           )}
           <div className="linha">
             <button className="botao ok" onClick={aprovar} disabled={aindaGerando} title={aindaGerando ? "Espere o vídeo ficar pronto" : ""}>
