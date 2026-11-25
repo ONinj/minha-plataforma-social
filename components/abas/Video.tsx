@@ -4,7 +4,7 @@ import { useState } from "react";
 import { custoEstimadoVideo, iniciarVideo } from "@/lib/servicos";
 import { useStore } from "@/lib/store";
 import { brl, formatarData } from "@/lib/util";
-import { BotaoBaixar, CartaoMidia, MidiaPorId } from "../MidiaView";
+import { BotaoBaixar, CartaoMidia, CartaoProducao, MidiaPorId } from "../MidiaView";
 import SeletorMidias from "../SeletorMidias";
 
 export default function Video({ provedor }: { provedor: "veo" | "seedance" }) {
@@ -21,7 +21,8 @@ export default function Video({ provedor }: { provedor: "veo" | "seedance" }) {
   const [erro, setErro] = useState<string>();
 
   const custo = custoEstimadoVideo(estado.config, provedor) * estado.config.cambio;
-  const videos = estado.midias.filter((m) => m.origem === provedor);
+  const videos = estado.midias.filter((m) => m.origem === provedor && m.status !== "gerando");
+  const emProducao = estado.midias.filter((m) => m.origem === provedor && m.status === "gerando");
 
   async function gerar() {
     if (!prompt.trim()) return;
@@ -32,6 +33,7 @@ export default function Video({ provedor }: { provedor: "veo" | "seedance" }) {
       await iniciarVideo(store, {
         provedor,
         prompt: prompt.trim(),
+        pedidoPor: "voce",
         titulo: titulo.trim() || prompt.trim().slice(0, 50),
         imagemId: imagem,
         proporcao,
@@ -48,6 +50,22 @@ export default function Video({ provedor }: { provedor: "veo" | "seedance" }) {
 
   return (
     <div className="conteudo">
+      {emProducao.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <h3 className="linha" style={{ gap: 8, margin: "0 0 12px" }}>
+            <span className="girando" /> Em produção agora ({emProducao.length})
+          </h3>
+          <div className="lista" style={{ gap: 10 }}>
+            {emProducao.map((m) => (
+              <CartaoProducao key={m.id} midia={m} />
+            ))}
+          </div>
+          <p className="ajuda" style={{ fontSize: 12 }}>
+            A porcentagem é uma estimativa pelo tempo médio dos seus últimos vídeos; o serviço não informa o progresso real.
+            O vídeo aparece abaixo e em Mídias assim que ficar pronto.
+          </p>
+        </div>
+      )}
       <div className="cartao" style={{ maxWidth: 820, marginBottom: 24 }}>
         <h3>Novo vídeo no {nome}</h3>
         <p className="ajuda">
@@ -110,7 +128,7 @@ export default function Video({ provedor }: { provedor: "veo" | "seedance" }) {
         {erro && <div className="erro-msg">{erro}</div>}
       </div>
 
-      <h3>Vídeos do {nome}</h3>
+      <h3>Vídeos prontos do {nome}</h3>
       {videos.length === 0 ? (
         <p className="vazio">Nenhum vídeo ainda.</p>
       ) : (

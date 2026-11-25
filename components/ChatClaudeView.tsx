@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MensagemClaude } from "@/lib/tipos";
 import Markdown from "./Markdown";
+import { formatarTempo, useAgora } from "@/lib/progresso";
 import Icone from "./Icone";
 import { MidiaPorId } from "./MidiaView";
 import SeletorMidias, { useUpload } from "./SeletorMidias";
@@ -172,11 +173,7 @@ export default function ChatClaudeView({
         {mensagens.map((m, i) => (
           <Mensagem key={i} msg={m} />
         ))}
-        {ocupado && (
-          <div className="etapa">
-            <div className="girando" /> {etapa ?? "Pensando..."}
-          </div>
-        )}
+        {ocupado && <Etapa texto={etapa ?? "Pensando..."} />}
         {erro && <div className="erro-msg">{erro}</div>}
         <div ref={fim} />
       </div>
@@ -226,6 +223,21 @@ export default function ChatClaudeView({
           aoFechar={() => setSeletor(false)}
         />
       )}
+    </div>
+  );
+}
+
+/** Linha "trabalhando" com o tempo correndo ao vivo. */
+export function Etapa({ texto, tipico }: { texto: string; tipico?: string }) {
+  const [inicio] = useState(() => Date.now());
+  const agora = useAgora(1000);
+  return (
+    <div className="etapa">
+      <div className="girando" /> {texto}
+      <span className="tempo-vivo">
+        {formatarTempo((agora - inicio) / 1000)}
+        {tipico ? ` · normalmente ${tipico}` : ""}
+      </span>
     </div>
   );
 }

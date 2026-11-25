@@ -20,6 +20,14 @@ export type Midia = {
   /** Imagem de IA liberada pelo usuário para servir de referência ao gerente. */
   referenciaAprovada?: boolean;
   favorita?: boolean;
+  /** Acompanhamento ao vivo da produção (vídeos). */
+  iniciadoEm?: string;
+  prontoEm?: string;
+  fase?: "fila" | "produzindo" | "baixando";
+  posicaoFila?: number;
+  detalhe?: string;
+  pedidoPor?: "gerente" | "voce";
+  imagemInicial?: string;
   /** Link externo, se o arquivo não pôde ser salvo localmente. */
   urlExterna?: string;
 };

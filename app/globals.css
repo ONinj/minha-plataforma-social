@@ -304,3 +304,21 @@ label { display: block; font-size: 12.5px; color: var(--texto-2); margin-bottom:
   .estatisticas, .acoes-rapidas { grid-template-columns: 1fr 1fr; }
   .acao-rapida span { display: none; }
 }
+
+/* ---------- Produção ao vivo ---------- */
+.producao { position: relative; overflow: hidden; flex-direction: column; background: radial-gradient(circle at 30% 20%, rgba(139,92,246,.35), transparent 60%), radial-gradient(circle at 80% 90%, rgba(34,211,238,.25), transparent 60%), #07080d; }
+.producao-fundo { position: absolute; inset: -10px; background-size: cover; background-position: center; filter: blur(8px) saturate(1.2) brightness(.55); transform: scale(1.05); animation: respirar 4s ease-in-out infinite; }
+.producao-brilho { position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.12) 50%, transparent 70%); background-size: 250% 100%; animation: varrer 2.2s linear infinite; }
+.producao-centro { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; padding: 8px; }
+.producao-centro strong { font-size: 22px; letter-spacing: -0.03em; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+.producao-centro span { font-size: 11px; color: rgba(255,255,255,.85); text-shadow: 0 1px 6px rgba(0,0,0,.7); }
+.producao-centro .producao-tempo { font-variant-numeric: tabular-nums; color: rgba(255,255,255,.7); }
+.producao.grande .producao-centro strong { font-size: 32px; }
+.producao.grande .producao-centro span { font-size: 12.5px; }
+.producao-barra { position: absolute; left: 8px; right: 8px; bottom: 8px; height: 5px; border-radius: 5px; background: rgba(255,255,255,.15); overflow: hidden; z-index: 1; }
+.producao-barra > div { height: 100%; background: var(--gradiente); border-radius: 5px; transition: width 1s linear; box-shadow: 0 0 12px rgba(139,92,246,.8); }
+.cartao-producao { display: flex; gap: 16px; padding: 14px; border-radius: var(--raio); background: linear-gradient(135deg, rgba(139,92,246,.1), rgba(34,211,238,.04)); border: 1px solid rgba(139,92,246,.3); }
+.tempo-vivo { font-variant-numeric: tabular-nums; color: var(--texto-3); font-size: 12.5px; }
+@keyframes varrer { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+@keyframes respirar { 50% { transform: scale(1.12); } }
+@media (max-width: 600px) { .cartao-producao { flex-direction: column; } .cartao-producao > div:first-child { width: 100% !important; } }

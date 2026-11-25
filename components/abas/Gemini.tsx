@@ -5,6 +5,7 @@ import { gerarImagemFal } from "@/lib/servicos";
 import { useStore } from "@/lib/store";
 import type { MensagemGemini, ParteGemini } from "@/lib/tipos";
 import { brl } from "@/lib/util";
+import { Etapa } from "../ChatClaudeView";
 import Icone from "../Icone";
 import { BotaoBaixar, CartaoMidia, MidiaPorId } from "../MidiaView";
 import SeletorMidias from "../SeletorMidias";
@@ -113,11 +114,7 @@ export default function Gemini() {
             )}
           </div>
         ))}
-        {ocupado && (
-          <div className="etapa">
-            <div className="girando" /> Nano Banana criando...
-          </div>
-        )}
+        {ocupado && <Etapa texto="Nano Banana criando a imagem..." tipico="10 a 30s" />}
         {erro && <div className="erro-msg">{erro}</div>}
         <div ref={fim} />
       </div>

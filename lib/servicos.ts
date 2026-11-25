@@ -142,6 +142,7 @@ export async function iniciarVideo(
     imagemId?: string;
     proporcao?: string;
     duracao?: string;
+    pedidoPor?: Midia["pedidoPor"];
   },
 ): Promise<Midia> {
   const config = store.obter().config;
@@ -186,6 +187,10 @@ export async function iniciarVideo(
     origem: params.provedor,
     status: "gerando",
     criadoEm: agoraISO(),
+    iniciadoEm: agoraISO(),
+    fase: "fila",
+    pedidoPor: params.pedidoPor ?? "voce",
+    imagemInicial: params.imagemId,
     job,
   };
   store.atualizar((e) => ({ ...e, midias: [midia, ...e.midias] }));
@@ -204,20 +209,34 @@ export async function verificarVideos(store: Store) {
         continue;
       }
       const q = new URLSearchParams({ endpoint: m.job.endpoint, requestId: m.job.requestId });
-      const r = await getJSON<{ pronto: boolean; url?: string; erro?: string }>(`/api/fal/video-status?${q}`, hFal(config));
-      if (!r.pronto) continue;
+      const r = await getJSON<{
+        pronto: boolean;
+        url?: string;
+        erro?: string;
+        fase?: Midia["fase"];
+        posicao?: number;
+        detalhe?: string;
+      }>(`/api/fal/video-status?${q}`, hFal(config));
+      if (!r.pronto) {
+        if (r.fase && (r.fase !== m.fase || r.posicao !== m.posicaoFila || r.detalhe !== m.detalhe)) {
+          store.atualizarMidia(m.id, { fase: r.fase, posicaoFila: r.posicao, detalhe: r.detalhe });
+        }
+        continue;
+      }
       if (r.erro || !r.url) {
-        store.atualizarMidia(m.id, { status: "erro", erro: r.erro });
+        store.atualizarMidia(m.id, { status: "erro", erro: r.erro, prontoEm: agoraISO() });
         store.avisar(`O vídeo "${m.titulo}" falhou.`, "erro");
         continue;
       }
+      store.atualizarMidia(m.id, { fase: "baixando" });
+      const prontoEm = agoraISO();
       try {
         const blob = await (await fetch(r.url)).blob();
         await store.salvarBlob(m.id, blob);
-        store.atualizarMidia(m.id, { status: "pronto", mime: blob.type || "video/mp4", urlExterna: r.url });
+        store.atualizarMidia(m.id, { status: "pronto", prontoEm, mime: blob.type || "video/mp4", urlExterna: r.url });
       } catch {
         // Se o navegador não conseguir baixar, guarda o link do fal.ai.
-        store.atualizarMidia(m.id, { status: "pronto", mime: "video/mp4", urlExterna: r.url });
+        store.atualizarMidia(m.id, { status: "pronto", prontoEm, mime: "video/mp4", urlExterna: r.url });
       }
       store.avisar(`Vídeo pronto: "${m.titulo}"`, "ok");
     } catch (e) {

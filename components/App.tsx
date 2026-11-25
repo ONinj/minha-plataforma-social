@@ -81,7 +81,7 @@ function Plataforma() {
   const [paraGerente, setParaGerente] = useState<string>();
   const [anexosParaGerente, setAnexosParaGerente] = useState<string[]>();
 
-  // Acompanha os vídeos em produção (de todos os perfis) a cada 15 segundos.
+  // Acompanha os vídeos em produção (de todos os perfis) a cada 5 segundos.
   const storeRef = useRef(store);
   storeRef.current = store;
   const gerando = conta.marcas.some((m) => m.midias.some((x) => x.status === "gerando"));
@@ -94,9 +94,15 @@ function Plataforma() {
       await verificarVideos(storeRef.current).finally(() => (rodando = false));
     };
     tick();
-    const t = setInterval(tick, 15000);
+    const t = setInterval(tick, 5000);
     return () => clearInterval(t);
   }, [gerando, conta.id]);
+
+  // Mostra no título da aba do navegador quantos vídeos estão sendo feitos.
+  const qtdGerando = conta.marcas.reduce((n, m) => n + m.midias.filter((x) => x.status === "gerando").length, 0);
+  useEffect(() => {
+    document.title = qtdGerando ? `⏳ ${qtdGerando} vídeo(s) em produção · Central Social` : "Central Social";
+  }, [qtdGerando]);
 
   useEffect(() => {
     if (carregado && !conta.config.chaveAnthropic && !conta.config.chaveFal) setAba("config");

@@ -1,5 +1,6 @@
 "use client";
 
+import { calcularAndamento, formatarTempo, useAgora } from "@/lib/progresso";
 import { useStore, useUrlMidia } from "@/lib/store";
 import type { Midia } from "@/lib/tipos";
 import { baixarArquivo } from "@/lib/util";
@@ -15,14 +16,7 @@ export function VisualMidia({ midia, controles = false }: { midia: Midia; contro
   const urlLocal = useUrlMidia(midia.status === "pronto" ? midia.id : undefined, midia.status);
   const url = urlLocal ?? midia.urlExterna;
 
-  if (midia.status === "gerando") {
-    return (
-      <div className="visual" style={{ flexDirection: "column", gap: 8, color: "var(--texto-2)", fontSize: 12 }}>
-        <div className="girando" />
-        Gerando no {NOMES_ORIGEM[midia.origem]}...
-      </div>
-    );
-  }
+  if (midia.status === "gerando") return <ProducaoAoVivo midia={midia} />;
   if (midia.status === "erro") {
     return (
       <div className="visual" style={{ color: "var(--erro)", fontSize: 12, padding: 8, textAlign: "center" }}>
@@ -96,5 +90,68 @@ export function BotaoBaixar({ midia }: { midia: Midia }) {
     >
       Baixar
     </button>
+  );
+}
+
+/** Prévia ao vivo de um vídeo em produção: fase, porcentagem estimada e tempo. */
+export function ProducaoAoVivo({ midia, grande = false }: { midia: Midia; grande?: boolean }) {
+  const { conta } = useStore();
+  const agora = useAgora(1000);
+  const referencia = useUrlMidia(midia.imagemInicial);
+  const historico = conta.marcas.flatMap((m) => m.midias);
+  const a = calcularAndamento(midia, historico, agora);
+  return (
+    <div className={`visual producao ${grande ? "grande" : ""}`}>
+      {referencia && <div className="producao-fundo" style={{ backgroundImage: `url(${referencia})` }} />}
+      <div className="producao-brilho" />
+      <div className="producao-centro">
+        <strong>{Math.floor(a.porcento)}%</strong>
+        <span>{a.rotulo}</span>
+        <span className="producao-tempo">
+          {formatarTempo(a.decorrido)}
+          {a.atrasado ? " · demorando mais que o normal" : a.restante != null ? ` · ~${formatarTempo(a.restante)} restantes` : ""}
+        </span>
+      </div>
+      <div className="producao-barra">
+        <div style={{ width: `${a.porcento}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/** Cartão grande de um vídeo sendo produzido (abas Veo e Seedance). */
+export function CartaoProducao({ midia }: { midia: Midia }) {
+  const nome = NOMES_ORIGEM[midia.origem];
+  return (
+    <div className="cartao-producao">
+      <div style={{ width: 200, flexShrink: 0 }}>
+        <div className="midia">
+          <ProducaoAoVivo midia={midia} grande />
+        </div>
+      </div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="linha" style={{ justifyContent: "space-between" }}>
+          <b style={{ fontSize: 15 }}>{midia.titulo}</b>
+          <span className="etiqueta" style={midia.pedidoPor === "gerente" ? { color: "var(--destaque-2)", borderColor: "rgba(139,92,246,.4)" } : undefined}>
+            {midia.pedidoPor === "gerente" ? "✨ pedido pelo gerente" : "pedido por você"}
+          </span>
+        </div>
+        <p className="ajuda" style={{ margin: "8px 0", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {midia.prompt}
+        </p>
+        <div className="linha" style={{ gap: 8 }}>
+          <span className="etiqueta">
+            <span className="girando" style={{ width: 10, height: 10, borderWidth: 2 }} /> {nome} ·{" "}
+            {midia.fase === "fila" ? "na fila" : midia.fase === "baixando" ? "baixando" : "produzindo"}
+          </span>
+          {midia.imagemInicial && <span className="etiqueta">com imagem inicial</span>}
+        </div>
+        {midia.detalhe && (
+          <p className="ajuda" style={{ fontFamily: "ui-monospace, monospace", fontSize: 11.5, marginBottom: 0 }}>
+            › {midia.detalhe}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

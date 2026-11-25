@@ -13,8 +13,14 @@ export async function GET(req: Request) {
   if (!endpoint || !requestId) return Response.json({ error: "Parâmetros ausentes." }, { status: 400 });
 
   try {
-    const status = await fal.queue.status(endpoint, { requestId, logs: false });
-    if (status.status !== "COMPLETED") return Response.json({ pronto: false });
+    const status = await fal.queue.status(endpoint, { requestId, logs: true });
+    if (status.status === "IN_QUEUE") {
+      return Response.json({ pronto: false, fase: "fila", posicao: status.queue_position });
+    }
+    if (status.status === "IN_PROGRESS") {
+      const ultimo = status.logs?.at(-1)?.message;
+      return Response.json({ pronto: false, fase: "produzindo", detalhe: ultimo?.slice(0, 160) });
+    }
 
     const resultado = await fal.queue.result(endpoint, { requestId });
     const dados = resultado.data as { video?: { url?: string } };

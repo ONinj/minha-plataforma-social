@@ -206,6 +206,7 @@ async function executar(
           prompt: String(entrada.prompt ?? ""),
           proporcao: entrada.proporcao as string | undefined,
           imagemId: entrada.imagem_inicial as string | undefined,
+          pedidoPor: "gerente",
         });
         return ok(`Vídeo em produção [midia:${midia.id}]. Fica pronto em alguns minutos; inclua este id nas mídias da aprovação.`);
       }
