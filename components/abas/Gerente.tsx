@@ -13,6 +13,7 @@ const SUGESTOES = [
   "Crie 3 cards de feed com dicas do nicho, com a mesma identidade visual.",
   "Faça um reels de 8 segundos apresentando o perfil, com uma imagem de referência antes.",
   "Escreva 5 legendas para posts desta semana, com chamadas diferentes.",
+  "Me faça as perguntas que faltam para você conhecer bem este perfil.",
 ];
 
 type PedidoReferencia = { midias: Midia[]; motivo: string; responder: (ok: boolean) => void };
