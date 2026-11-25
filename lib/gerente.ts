@@ -279,7 +279,14 @@ export async function rodarGerente(
 ) {
   const hoje = new Date().toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" });
   const tamanhoAntes = store.obter().chatGerente.length;
-  adicionarMensagem(store, { role: "user", content: await montarMensagem(store, `[Agora: ${hoje}]\n${texto}`, anexos) });
+  const conteudo = await montarMensagem(store, `[Agora: ${hoje}]\n${texto}`, anexos);
+  const pendentes = resultadosInterrompidos(store.obter().chatGerente);
+  adicionarMensagem(store, {
+    role: "user",
+    content: pendentes.length
+      ? [...pendentes, ...(typeof conteudo === "string" ? [{ type: "text" as const, text: conteudo }] : conteudo)]
+      : conteudo,
+  });
   const perfil = mensagemDePerfil(store.obter().chatGerente, textoDoPerfil(store));
   if (perfil) adicionarMensagem(store, perfil);
 
@@ -358,4 +365,24 @@ async function montarMensagem(
   }
   blocos.push({ type: "text", text: texto });
   return blocos;
+}
+
+/**
+ * Se a página foi recarregada no meio de uma tarefa, a última resposta do Claude pode ter
+ * pedidos de ferramenta sem resultado (o Claude recusa a conversa assim). Gera resultados
+ * de "interrompido" para esses pedidos, sem apagar nada do histórico.
+ */
+function resultadosInterrompidos(chat: MensagemClaude[]): Anthropic.Beta.BetaToolResultBlockParam[] {
+  const conversa = chat.filter((m) => m.role !== "system");
+  const ultima = conversa.at(-1);
+  if (!ultima || ultima.role !== "assistant" || typeof ultima.content === "string") return [];
+  return ultima.content
+    .filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use")
+    .map((b) => ({
+      type: "tool_result" as const,
+      tool_use_id: b.id,
+      is_error: true,
+      content:
+        "Interrompido: a página foi recarregada antes desta ação terminar, então não sei se ela foi executada. Use listar_midias para conferir o que existe (vídeos podem estar em produção) antes de repetir.",
+    }));
 }

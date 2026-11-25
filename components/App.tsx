@@ -98,6 +98,17 @@ function Plataforma() {
     return () => clearInterval(t);
   }, [gerando, conta.id]);
 
+  // Avisa antes de fechar/recarregar a página enquanto o gerente está trabalhando.
+  useEffect(() => {
+    if (!store.ocupado) return;
+    const aviso = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", aviso);
+    return () => window.removeEventListener("beforeunload", aviso);
+  }, [store.ocupado]);
+
   // Mostra no título da aba do navegador quantos vídeos estão sendo feitos.
   const qtdGerando = conta.marcas.reduce((n, m) => n + m.midias.filter((x) => x.status === "gerando").length, 0);
   useEffect(() => {
