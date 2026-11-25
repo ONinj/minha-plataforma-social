@@ -15,7 +15,7 @@ export function sql(): postgres.Sql {
     const url = process.env.DATABASE_URL?.trim();
     if (!url) throw new Error("DATABASE_URL não configurada.");
     // prepare:false é necessário com o pooler do Supabase (modo transação).
-    _sql = postgres(url, { prepare: false, max: 3, idle_timeout: 20 });
+    _sql = postgres(url, { prepare: false, max: 3, idle_timeout: 20, connect_timeout: 10 });
   }
   return _sql;
 }
@@ -45,14 +45,20 @@ export function responderErro(e: unknown) {
 let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
 async function verificarToken(token: string): Promise<JWTPayload> {
-  const segredo = process.env.SUPABASE_JWT_SECRET;
-  if (segredo) {
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(segredo));
-    return payload;
+  const segredo = process.env.SUPABASE_JWT_SECRET?.trim();
+  try {
+    if (segredo) return (await jwtVerify(token, new TextEncoder().encode(segredo))).payload;
+    if (!jwks) jwks = createRemoteJWKSet(new URL(`${urlSupabase()}/auth/v1/.well-known/jwks.json`));
+    return (await jwtVerify(token, jwks)).payload;
+  } catch (erroLocal) {
+    // Plano B: pergunta ao próprio Supabase quem é o dono do token (funciona com qualquer tipo de chave).
+    const chave = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+    if (!chave) throw erroLocal;
+    const r = await fetch(`${urlSupabase()}/auth/v1/user`, { headers: { apikey: chave, Authorization: `Bearer ${token}` } });
+    if (!r.ok) throw erroLocal;
+    const u = (await r.json()) as { id: string; email?: string };
+    return { sub: u.id, email: u.email } as JWTPayload;
   }
-  if (!jwks) jwks = createRemoteJWKSet(new URL(`${urlSupabase()}/auth/v1/.well-known/jwks.json`));
-  const { payload } = await jwtVerify(token, jwks);
-  return payload;
 }
 
 export type Recursos = {

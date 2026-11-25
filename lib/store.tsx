@@ -63,6 +63,8 @@ type Contexto = {
   importarLocal: () => Promise<void>;
   recusarImportacao: () => void;
   sair: () => Promise<void>;
+  /** Erro ao carregar a conta da nuvem (mostrado na tela, com opção de tentar de novo). */
+  erroCarga: string | null;
 };
 
 const Ctx = createContext<Contexto | null>(null);
@@ -203,6 +205,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [nuvem, setNuvem] = useState<InfoNuvem | null>(null);
   const [sessao, setSessao] = useState<"carregando" | "sem_login" | "pronta">(MODO_NUVEM ? "carregando" : "pronta");
   const [importavel, setImportavel] = useState<Raiz | null>(null);
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
   const ref = useRef<Raiz>(raiz);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ultimaSincronia = useRef(0);
@@ -291,7 +294,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           iniciou = false;
           const codigo = (e as { codigo?: string }).codigo;
           if (codigo === "sem_login") setSessao("sem_login");
-          else avisar(`Não consegui carregar sua conta: ${e instanceof Error ? e.message : e}`, "erro");
+          else setErroCarga(e instanceof Error ? e.message : String(e));
         } finally {
           setCarregado(true);
         }
@@ -637,6 +640,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         importarLocal,
         recusarImportacao,
         sair,
+        erroCarga,
       }}
     >
       {children}

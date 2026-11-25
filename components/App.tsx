@@ -133,6 +133,25 @@ function Plataforma() {
   }, [carregado]);
 
   if (MODO_NUVEM && carregado && store.sessao === "sem_login") return <Login />;
+  if (MODO_NUVEM && store.erroCarga && store.sessao !== "pronta") {
+    return (
+      <div className="tela-login">
+        <div className="login-caixa">
+          <h2 className="titulo-pagina">Não consegui abrir sua conta</h2>
+          <p className="ajuda">O login funcionou, mas o servidor respondeu com este erro:</p>
+          <div className="erro-msg">{store.erroCarga}</div>
+          <p className="ajuda">
+            Se você é o administrador, abra <a href="/api/saude" target="_blank">/api/saude</a> para ver o que está faltando na
+            configuração.
+          </p>
+          <div className="linha" style={{ justifyContent: "flex-end" }}>
+            <button className="botao sec" onClick={() => store.sair()}>Sair</button>
+            <button className="botao" onClick={() => window.location.reload()}>Tentar de novo</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!carregado || (MODO_NUVEM && store.sessao !== "pronta")) {
     return (
       <div className="vazio" style={{ paddingTop: "40vh" }}>
