@@ -8,7 +8,7 @@ const NOMES_ORIGEM: Record<Midia["origem"], string> = {
   gemini: "Imagem IA",
   veo: "Veo",
   seedance: "Seedance",
-  upload: "Upload",
+  upload: "Enviado por você",
 };
 
 export function VisualMidia({ midia, controles = false }: { midia: Midia; controles?: boolean }) {

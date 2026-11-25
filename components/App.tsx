@@ -23,7 +23,7 @@ const ABAS: { id: IdAba; nome: string; cor: string; descricao: string }[] = [
   { id: "seedance", nome: "Seedance", cor: "var(--seedance)", descricao: "Vídeos com o Seedance (via fal.ai)." },
   { id: "aprovacoes", nome: "Aprovações", cor: "var(--alerta)", descricao: "Tudo o que o gerente entregou esperando o seu OK." },
   { id: "agendamentos", nome: "Agendamentos", cor: "var(--ok)", descricao: "O seu calendário: o que está a programar, programado e postado." },
-  { id: "midias", nome: "Mídias", cor: "var(--texto-2)", descricao: "Biblioteca com todas as imagens e vídeos." },
+  { id: "midias", nome: "Mídias e envios", cor: "var(--texto-2)", descricao: "Envie suas fotos e vídeos e veja tudo o que as IAs criaram." },
   { id: "config", nome: "Configurações", cor: "var(--texto-2)", descricao: "Chaves das IAs, perfil da marca, modelos e controle de gastos." },
 ];
 
@@ -40,6 +40,7 @@ function Plataforma() {
   const { estado, carregado } = store;
   const [aba, setAba] = useState<IdAba>("central");
   const [paraGerente, setParaGerente] = useState<string>();
+  const [anexosParaGerente, setAnexosParaGerente] = useState<string[]>();
 
   const semChaves = !estado.config.chaveAnthropic && !estado.config.chaveGoogle && !estado.config.chaveFal;
   useEffect(() => {
@@ -110,14 +111,28 @@ function Plataforma() {
           <p>{atual.descricao}</p>
         </header>
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflowY: "auto" }}>
-          {aba === "central" && <Gerente pendente={paraGerente} aoConsumir={() => setParaGerente(undefined)} />}
+          {aba === "central" && (
+            <Gerente
+              pendente={paraGerente}
+              anexosIniciais={anexosParaGerente}
+              aoConsumir={() => setParaGerente(undefined)}
+              aoConsumirAnexos={() => setAnexosParaGerente(undefined)}
+            />
+          )}
           {aba === "claude" && <ClaudeDireto />}
           {aba === "gemini" && <Gemini />}
           {aba === "veo" && <Video key="veo" provedor="veo" />}
           {aba === "seedance" && <Video key="seedance" provedor="seedance" />}
           {aba === "aprovacoes" && <Aprovacoes falarComGerente={falarComGerente} />}
           {aba === "agendamentos" && <Agendamentos />}
-          {aba === "midias" && <Midias />}
+          {aba === "midias" && (
+            <Midias
+              mandarParaCentral={(ids) => {
+                setAnexosParaGerente(ids);
+                setAba("central");
+              }}
+            />
+          )}
           {aba === "config" && <Configuracoes />}
         </div>
       </main>

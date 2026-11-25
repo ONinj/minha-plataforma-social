@@ -16,6 +16,8 @@ export type Midia = {
   job?:
     | { provedor: "veo"; operacao: string }
     | { provedor: "seedance" | "fal"; endpoint: string; requestId: string };
+  /** Imagem de IA liberada pelo usuário para servir de referência ao gerente. */
+  referenciaAprovada?: boolean;
   /** Link externo, se o arquivo não pôde ser salvo localmente. */
   urlExterna?: string;
 };

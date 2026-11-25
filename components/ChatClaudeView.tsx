@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { MensagemClaude } from "@/lib/tipos";
 import Markdown from "./Markdown";
 import { MidiaPorId } from "./MidiaView";
+import SeletorMidias from "./SeletorMidias";
 
 const NOMES_FERRAMENTAS: Record<string, string> = {
   gerar_imagem: "Pediu uma imagem (Nano Banana)",
@@ -17,18 +18,34 @@ function idsDeMidia(texto: string): string[] {
   return [...texto.matchAll(/\[midia:([\w]+)\]/g)].map((m) => m[1]);
 }
 
+const semData = (t: string) => t.replace(/^\[Agora: [^\]]*\]\n/, "");
+
 function Mensagem({ msg }: { msg: MensagemClaude }) {
   if (msg.role === "system") {
     return <div className="ferramenta">📋 Perfil da marca atualizado para o Claude</div>;
   }
   if (msg.role === "user") {
     if (typeof msg.content === "string") {
-      return <div className="msg usuario">{msg.content.replace(/^\[Agora: [^\]]*\]\n/, "")}</div>;
+      return <div className="msg usuario">{semData(msg.content)}</div>;
     }
+    const textos = msg.content.filter((b) => b.type === "text");
+    const anexos = textos.filter((b) => b.text.startsWith("[midia:")).flatMap((b) => idsDeMidia(b.text));
+    const falas = textos.filter((b) => !b.text.startsWith("[midia:"));
     return (
       <>
+        {anexos.length > 0 && (
+          <div className="linha" style={{ alignSelf: "flex-end" }}>
+            {anexos.map((id) => (
+              <MidiaPorId key={id} id={id} />
+            ))}
+          </div>
+        )}
+        {falas.map((b, i) => (
+          <div key={`t${i}`} className="msg usuario">
+            {semData(b.text)}
+          </div>
+        ))}
         {msg.content.map((bloco, i) => {
-          if (bloco.type === "text") return <div key={i} className="msg usuario">{bloco.text}</div>;
           if (bloco.type !== "tool_result") return null;
           const texto =
             typeof bloco.content === "string"
@@ -38,7 +55,7 @@ function Mensagem({ msg }: { msg: MensagemClaude }) {
           const curto = texto.length > 220 ? `${texto.slice(0, 220)}…` : texto;
           return (
             <div key={i} className={`ferramenta ${bloco.is_error ? "erro" : ""}`}>
-              {ids.length > 0 ? (
+              {ids.length > 0 && !bloco.is_error ? (
                 <div className="linha">
                   {ids.map((id) => (
                     <MidiaPorId key={id} id={id} />
@@ -88,6 +105,8 @@ export default function ChatClaudeView({
   placeholder,
   boasVindas,
   aoEnviar,
+  permitirAnexos = false,
+  anexosIniciais,
 }: {
   mensagens: MensagemClaude[];
   ocupado: boolean;
@@ -95,20 +114,29 @@ export default function ChatClaudeView({
   erro?: string;
   placeholder: string;
   boasVindas: React.ReactNode;
-  aoEnviar: (texto: string) => void;
+  aoEnviar: (texto: string, anexos: string[]) => void;
+  permitirAnexos?: boolean;
+  anexosIniciais?: string[];
 }) {
   const [texto, setTexto] = useState("");
+  const [anexos, setAnexos] = useState<string[]>([]);
+  const [seletor, setSeletor] = useState(false);
   const fim = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fim.current?.scrollIntoView({ behavior: "smooth" });
   }, [mensagens.length, etapa, erro]);
 
+  useEffect(() => {
+    if (anexosIniciais?.length) setAnexos((a) => [...new Set([...a, ...anexosIniciais])]);
+  }, [anexosIniciais]);
+
   function enviar() {
     const t = texto.trim();
-    if (!t || ocupado) return;
+    if ((!t && !anexos.length) || ocupado) return;
     setTexto("");
-    aoEnviar(t);
+    setAnexos([]);
+    aoEnviar(t, anexos);
   }
 
   return (
@@ -126,7 +154,22 @@ export default function ChatClaudeView({
         {erro && <div className="erro-msg">{erro}</div>}
         <div ref={fim} />
       </div>
+      {anexos.length > 0 && (
+        <div className="anexos">
+          {anexos.map((id) => (
+            <MidiaPorId key={id} id={id} />
+          ))}
+          <button className="botao sec peq" onClick={() => setAnexos([])}>
+            Remover anexos
+          </button>
+        </div>
+      )}
       <div className="entrada">
+        {permitirAnexos && (
+          <button className="botao sec" onClick={() => setSeletor(true)} title="Anexar fotos ou vídeos" disabled={ocupado}>
+            📎
+          </button>
+        )}
         <textarea
           value={texto}
           placeholder={placeholder}
@@ -138,10 +181,19 @@ export default function ChatClaudeView({
             }
           }}
         />
-        <button className="botao" onClick={enviar} disabled={ocupado || !texto.trim()}>
+        <button className="botao" onClick={enviar} disabled={ocupado || (!texto.trim() && !anexos.length)}>
           Enviar
         </button>
       </div>
+      {seletor && (
+        <SeletorMidias
+          titulo="Anexar fotos ou vídeos"
+          tipos={["imagem", "video"]}
+          selecionadas={anexos}
+          aoConfirmar={setAnexos}
+          aoFechar={() => setSeletor(false)}
+        />
+      )}
     </div>
   );
 }

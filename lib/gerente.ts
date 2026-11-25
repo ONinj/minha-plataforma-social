@@ -3,11 +3,48 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { useStore } from "./store";
 import { chamarClaude, custoEstimadoVideo, gerarImagem, iniciarVideo } from "./servicos";
-import type { Aprovacao, MensagemClaude, TipoConteudo } from "./tipos";
+import type { Aprovacao, MensagemClaude, Midia, TipoConteudo } from "./tipos";
 import { mensagemDePerfil } from "./perfil";
 import { agoraISO, blobParaBase64, brl, novoId, reduzirImagem } from "./util";
 
 type Store = ReturnType<typeof useStore>;
+
+export type Interacoes = {
+  /** Pergunta sim/não (ex.: custo de um vídeo). */
+  confirmar: (mensagem: string) => Promise<boolean>;
+  /** Mostra imagens feitas por IA e pede autorização para usá-las como referência. */
+  aprovarReferencias: (midias: Midia[], motivo: string) => Promise<boolean>;
+};
+
+/**
+ * Imagens feitas por IA só viram referência com o OK do usuário. Fotos e vídeos que o
+ * próprio usuário enviou já estão liberados. Devolve uma mensagem de erro, ou null se puder seguir.
+ */
+async function checarReferencias(
+  store: Store,
+  ids: string[],
+  motivo: string,
+  interacoes: Interacoes,
+): Promise<string | null> {
+  const midias = store.obter().midias;
+  const faltando = ids.filter((id) => !midias.some((m) => m.id === id));
+  if (faltando.length) return `Ids de mídia não encontrados: ${faltando.join(", ")}`;
+  const usadas = ids.map((id) => midias.find((m) => m.id === id)!);
+  const naoImagem = usadas.filter((m) => m.tipo !== "imagem" || m.status !== "pronto");
+  if (naoImagem.length) return `Só imagens prontas podem ser referência: ${naoImagem.map((m) => m.id).join(", ")}`;
+  const pendentes = usadas.filter((m) => m.origem !== "upload" && !m.referenciaAprovada);
+  if (!pendentes.length) return null;
+  const ok = await interacoes.aprovarReferencias(pendentes, motivo);
+  if (!ok) {
+    return `O usuário NÃO aprovou ${pendentes.map((m) => `[midia:${m.id}]`).join(" ")} como referência. Não use essas imagens como referência; pergunte como ele prefere seguir (outra imagem, gerar de novo ou sem referência).`;
+  }
+  const aprovados = new Set(pendentes.map((m) => m.id));
+  store.atualizar((e) => ({
+    ...e,
+    midias: e.midias.map((m) => (aprovados.has(m.id) ? { ...m, referenciaAprovada: true } : m)),
+  }));
+  return null;
+}
 
 // O texto de sistema nunca muda durante a conversa (exigência do Claude para manter o
 // raciocínio salvo válido). O perfil da marca entra como mensagem de sistema na conversa.
@@ -100,7 +137,7 @@ type ResultadoFerramenta = Anthropic.Beta.BetaToolResultBlockParam;
 async function executar(
   store: Store,
   bloco: Anthropic.Beta.BetaToolUseBlock,
-  confirmar: (mensagem: string) => Promise<boolean>,
+  interacoes: Interacoes,
 ): Promise<ResultadoFerramenta> {
   const entrada = bloco.input as Record<string, unknown>;
   const ok = (content: ResultadoFerramenta["content"]): ResultadoFerramenta => ({
@@ -118,11 +155,16 @@ async function executar(
   try {
     switch (bloco.name) {
       case "gerar_imagem": {
+        const refs = (entrada.referencias as string[] | undefined) ?? [];
+        if (refs.length) {
+          const problema = await checarReferencias(store, refs, `para criar "${String(entrada.titulo ?? "imagem")}"`, interacoes);
+          if (problema) return erro(problema);
+        }
         const { midias, texto } = await gerarImagem(store, {
           titulo: String(entrada.titulo ?? "Imagem"),
           prompt: String(entrada.prompt ?? ""),
           proporcao: entrada.proporcao as string | undefined,
-          referencias: (entrada.referencias as string[] | undefined) ?? [],
+          referencias: refs,
         });
         const conteudo: Exclude<ResultadoFerramenta["content"], string | undefined> = [
           {
@@ -145,9 +187,14 @@ async function executar(
       case "gerar_video": {
         const provedor = entrada.provedor === "seedance" ? "seedance" : "veo";
         const config = store.obter().config;
+        const inicial = entrada.imagem_inicial as string | undefined;
+        if (inicial) {
+          const problema = await checarReferencias(store, [inicial], `no vídeo "${String(entrada.titulo ?? "vídeo")}" (como primeiro quadro)`, interacoes);
+          if (problema) return erro(problema);
+        }
         if (config.confirmarVideos) {
           const custo = custoEstimadoVideo(config, provedor) * config.cambio;
-          const aceito = await confirmar(
+          const aceito = await interacoes.confirmar(
             `O gerente quer gerar um vídeo no ${provedor === "veo" ? "Veo" : "Seedance"}:\n\n"${String(entrada.titulo)}"\n\nCusto estimado: ${brl(custo)}. Autorizar?`,
           );
           if (!aceito) return erro("O usuário não autorizou a geração deste vídeo. Pergunte como ele prefere seguir.");
@@ -224,12 +271,13 @@ function adicionarMensagem(store: Store, msg: MensagemClaude) {
 export async function rodarGerente(
   store: Store,
   texto: string,
-  confirmar: (mensagem: string) => Promise<boolean>,
+  anexos: string[],
+  interacoes: Interacoes,
   aoMudarEtapa: (etapa: string) => void,
 ) {
   const hoje = new Date().toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" });
   const tamanhoAntes = store.obter().chatGerente.length;
-  adicionarMensagem(store, { role: "user", content: `[Agora: ${hoje}]\n${texto}` });
+  adicionarMensagem(store, { role: "user", content: await montarMensagem(store, `[Agora: ${hoje}]\n${texto}`, anexos) });
   const perfil = mensagemDePerfil(store.obter().chatGerente, store.obter().config.perfilMarca);
   if (perfil) adicionarMensagem(store, perfil);
 
@@ -259,7 +307,7 @@ export async function rodarGerente(
     const resultados: ResultadoFerramenta[] = [];
     for (const chamada of chamadas) {
       aoMudarEtapa(descreverEtapa(chamada));
-      resultados.push(await executar(store, chamada, confirmar));
+      resultados.push(await executar(store, chamada, interacoes));
     }
     adicionarMensagem(store, { role: "user", content: resultados });
   }
@@ -278,4 +326,34 @@ function descreverEtapa(b: Anthropic.Beta.BetaToolUseBlock): string {
     default:
       return "Consultando a plataforma...";
   }
+}
+
+/** Monta a mensagem do usuário com as fotos/vídeos anexados (o Claude vê as fotos). */
+async function montarMensagem(
+  store: Store,
+  texto: string,
+  anexos: string[],
+): Promise<Anthropic.Beta.BetaMessageContentParam> {
+  if (!anexos.length) return texto;
+  const blocos: Exclude<Anthropic.Beta.BetaMessageContentParam, string> = [];
+  for (const id of anexos) {
+    const m = store.obter().midias.find((x) => x.id === id);
+    if (!m) continue;
+    const origem = m.origem === "upload" ? "enviada pelo usuário (foto/vídeo real, liberada para referência)" : `gerada por IA (${m.origem})`;
+    if (m.tipo === "video") {
+      blocos.push({
+        type: "text",
+        text: `[midia:${m.id}] Vídeo "${m.titulo}", ${origem}. Você não consegue assistir a vídeos; use o id para enviar à aprovação/publicação.`,
+      });
+      continue;
+    }
+    blocos.push({ type: "text", text: `[midia:${m.id}] Imagem "${m.titulo}", ${origem}:` });
+    const blob = await store.lerBlob(m.id);
+    if (blob) {
+      const pequena = await reduzirImagem(blob, 1024, 0.8);
+      blocos.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: await blobParaBase64(pequena) } });
+    }
+  }
+  blocos.push({ type: "text", text: texto });
+  return blocos;
 }

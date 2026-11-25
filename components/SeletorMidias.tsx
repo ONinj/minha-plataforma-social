@@ -31,7 +31,15 @@ export function useUpload() {
   };
 }
 
-export function BotaoUpload({ aoEnviar, rotulo = "Enviar arquivo" }: { aoEnviar?: (m: Midia[]) => void; rotulo?: string }) {
+export function BotaoUpload({
+  aoEnviar,
+  rotulo = "Enviar arquivo",
+  aceitar = "image/*,video/*",
+}: {
+  aoEnviar?: (m: Midia[]) => void;
+  rotulo?: string;
+  aceitar?: string;
+}) {
   const input = useRef<HTMLInputElement>(null);
   const upload = useUpload();
   return (
@@ -39,7 +47,7 @@ export function BotaoUpload({ aoEnviar, rotulo = "Enviar arquivo" }: { aoEnviar?
       <input
         ref={input}
         type="file"
-        accept="image/*,video/*"
+        accept={aceitar}
         multiple
         hidden
         onChange={async (e) => {
@@ -59,17 +67,21 @@ export function BotaoUpload({ aoEnviar, rotulo = "Enviar arquivo" }: { aoEnviar?
 export default function SeletorMidias({
   selecionadas,
   multiplo = true,
+  tipos = ["imagem"],
+  titulo = "Escolher imagem de referência",
   aoConfirmar,
   aoFechar,
 }: {
   selecionadas: string[];
   multiplo?: boolean;
+  tipos?: Midia["tipo"][];
+  titulo?: string;
   aoConfirmar: (ids: string[]) => void;
   aoFechar: () => void;
 }) {
   const { estado } = useStore();
   const [escolha, setEscolha] = useState<string[]>(selecionadas);
-  const imagens = estado.midias.filter((m) => m.tipo === "imagem" && m.status === "pronto");
+  const imagens = estado.midias.filter((m) => tipos.includes(m.tipo) && m.status === "pronto");
 
   function alternar(id: string) {
     if (!multiplo) return setEscolha([id]);
@@ -80,11 +92,18 @@ export default function SeletorMidias({
     <div className="modal-fundo" onClick={aoFechar}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="linha" style={{ justifyContent: "space-between", marginBottom: 12 }}>
-          <h3 style={{ margin: 0 }}>Escolher imagem de referência</h3>
-          <BotaoUpload rotulo="Enviar do computador" aoEnviar={(n) => n[0] && alternar(n[0].id)} />
+          <h3 style={{ margin: 0 }}>{titulo}</h3>
+          <BotaoUpload
+            rotulo="Enviar do computador/celular"
+            aceitar={tipos.includes("video") ? "image/*,video/*" : "image/*"}
+            aoEnviar={(n) => {
+              if (!multiplo) return n[0] && alternar(n[0].id);
+              setEscolha((s) => [...new Set([...s, ...n.map((m) => m.id)])]);
+            }}
+          />
         </div>
         {imagens.length === 0 ? (
-          <p className="vazio">Nenhuma imagem na biblioteca ainda.</p>
+          <p className="vazio">Nada na biblioteca ainda. Use o botão acima para enviar.</p>
         ) : (
           <div className="grade-midias">
             {imagens.map((m) => (
