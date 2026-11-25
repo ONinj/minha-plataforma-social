@@ -18,6 +18,9 @@ function idsDeMidia(texto: string): string[] {
 }
 
 function Mensagem({ msg }: { msg: MensagemClaude }) {
+  if (msg.role === "system") {
+    return <div className="ferramenta">📋 Perfil da marca atualizado para o Claude</div>;
+  }
   if (msg.role === "user") {
     if (typeof msg.content === "string") {
       return <div className="msg usuario">{msg.content.replace(/^\[Agora: [^\]]*\]\n/, "")}</div>;

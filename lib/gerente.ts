@@ -4,12 +4,14 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { useStore } from "./store";
 import { chamarClaude, custoEstimadoVideo, gerarImagem, iniciarVideo } from "./servicos";
 import type { Aprovacao, MensagemClaude, TipoConteudo } from "./tipos";
+import { mensagemDePerfil } from "./perfil";
 import { agoraISO, blobParaBase64, brl, novoId, reduzirImagem } from "./util";
 
 type Store = ReturnType<typeof useStore>;
 
-export function systemGerente(perfilMarca: string): string {
-  return `Você é o gerente de marketing de uma plataforma pessoal de gestão de redes sociais. Você conversa em português do Brasil com o dono das redes, que só dá ideias e aprova o que você entrega.
+// O texto de sistema nunca muda durante a conversa (exigência do Claude para manter o
+// raciocínio salvo válido). O perfil da marca entra como mensagem de sistema na conversa.
+export const SYSTEM_GERENTE = `Você é o gerente de marketing de uma plataforma pessoal de gestão de redes sociais. Você conversa em português do Brasil com o dono das redes, que só dá ideias e aprova o que você entrega.
 
 Sua equipe (você aciona pelas ferramentas):
 - Gemini (ferramenta gerar_imagem): cria os criativos — cards do feed, stories, capas e as imagens de referência para os vídeos.
@@ -24,10 +26,7 @@ Como trabalhar:
 - Formatos: feed 4:5 ou 1:1, stories e reels 9:16.
 - Seja direto e organizado. No fim de cada entrega, resuma o que foi feito e o que está esperando aprovação.
 - Use listar_agendamentos para não repetir temas e para encaixar datas livres no calendário.
-
-Perfil da marca / redes do usuário:
-${perfilMarca.trim() || "(ainda não preenchido — pergunte ao usuário sobre nicho, público, tom de voz e redes quando for relevante)"}`;
-}
+- O perfil da marca chega em mensagens de sistema ao longo da conversa; vale sempre o mais recente. Se não houver perfil, pergunte ao usuário sobre nicho, público, tom de voz e redes quando for relevante.`;
 
 export const FERRAMENTAS: Anthropic.Beta.BetaTool[] = [
   {
@@ -229,17 +228,28 @@ export async function rodarGerente(
   aoMudarEtapa: (etapa: string) => void,
 ) {
   const hoje = new Date().toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" });
+  const tamanhoAntes = store.obter().chatGerente.length;
   adicionarMensagem(store, { role: "user", content: `[Agora: ${hoje}]\n${texto}` });
+  const perfil = mensagemDePerfil(store.obter().chatGerente, store.obter().config.perfilMarca);
+  if (perfil) adicionarMensagem(store, perfil);
 
   for (let volta = 0; volta < 25; volta++) {
     aoMudarEtapa(volta === 0 ? "Claude pensando..." : "Claude revisando os resultados...");
     const { chatGerente, config } = store.obter();
-    const resposta = await chamarClaude(store, {
-      system: systemGerente(config.perfilMarca),
-      messages: chatGerente,
-      tools: FERRAMENTAS,
-      effort: config.esforcoGerente,
-    });
+    let resposta;
+    try {
+      resposta = await chamarClaude(store, {
+        system: SYSTEM_GERENTE,
+        messages: chatGerente,
+        tools: FERRAMENTAS,
+        effort: config.esforcoGerente,
+      });
+    } catch (e) {
+      // Se falhou logo na primeira chamada, desfaz a mensagem enviada para a conversa
+      // continuar válida (só mexe no fim do histórico, nunca no meio).
+      if (volta === 0) store.atualizar((est) => ({ ...est, chatGerente: est.chatGerente.slice(0, tamanhoAntes) }));
+      throw e;
+    }
     adicionarMensagem(store, { role: "assistant", content: resposta.content });
 
     if (resposta.stop_reason === "pause_turn") continue;

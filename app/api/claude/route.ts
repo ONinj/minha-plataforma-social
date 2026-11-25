@@ -31,8 +31,11 @@ export async function POST(req: Request) {
       messages: corpo.messages,
       tools: corpo.tools && corpo.tools.length > 0 ? corpo.tools : undefined,
       output_config: corpo.effort ? { effort: corpo.effort } : undefined,
+      // Se algum trecho antigo da conversa não bater com o raciocínio salvo, a API
+      // descarta esse raciocínio e segue, em vez de travar a conversa com erro 400.
+      thinking: { type: "adaptive", block_binding: { prefix_mismatch_behavior: "drop_block" } },
       // Se o modelo recusar por política, a API tenta outro modelo automaticamente.
-      betas: ["server-side-fallback-2026-07-01"],
+      betas: ["server-side-fallback-2026-07-01", "thinking-binding-controls-2026-08-01"],
       fallbacks: "default",
       // Cache automático do histórico: deixa as conversas longas bem mais baratas.
       cache_control: { type: "ephemeral" },

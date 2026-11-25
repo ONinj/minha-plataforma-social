@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { mensagemDePerfil } from "@/lib/perfil";
 import { chamarClaude } from "@/lib/servicos";
 import { useStore } from "@/lib/store";
 import ChatClaudeView from "../ChatClaudeView";
@@ -16,11 +17,15 @@ export default function ClaudeDireto() {
   async function enviar(texto: string) {
     setErro(undefined);
     setOcupado(true);
-    store.atualizar((e) => ({ ...e, chatClaude: [...e.chatClaude, { role: "user", content: texto }] }));
+    const tamanhoAntes = store.obter().chatClaude.length;
+    store.atualizar((e) => {
+      const chat = [...e.chatClaude, { role: "user" as const, content: texto }];
+      const perfil = mensagemDePerfil(chat, e.config.perfilMarca);
+      return { ...e, chatClaude: perfil ? [...chat, perfil] : chat };
+    });
     try {
-      const perfil = store.obter().config.perfilMarca.trim();
       const resposta = await chamarClaude(store, {
-        system: perfil ? `${SYSTEM}\n\nPerfil da marca do usuário:\n${perfil}` : SYSTEM,
+        system: SYSTEM,
         messages: store.obter().chatClaude,
         effort: "medium",
       });
@@ -32,7 +37,7 @@ export default function ClaudeDireto() {
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
       // Remove a pergunta sem resposta para a conversa continuar válida.
-      store.atualizar((e) => ({ ...e, chatClaude: e.chatClaude.slice(0, -1) }));
+      store.atualizar((e) => ({ ...e, chatClaude: e.chatClaude.slice(0, tamanhoAntes) }));
     } finally {
       setOcupado(false);
     }
