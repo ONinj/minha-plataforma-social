@@ -4,8 +4,9 @@ Plataforma para social medias gerenciarem vários perfis com IA num lugar só. O
 
 Ferramentas:
 
-- **Central (Gerente):** você conversa só com o Claude. Ele planeja, escreve os prompts, manda o Gemini criar as imagens e o Veo/Seedance gerar os vídeos, revisa o resultado e coloca tudo em **Aprovações**.
-- **Claude, Gemini, Veo e Seedance:** uma aba para usar cada IA diretamente.
+- **Central (Gerente):** você conversa só com o Claude. Ele planeja, escreve os prompts, cria as imagens (Nano Banana 2) e os vídeos (Veo e Seedance), revisa o resultado e coloca tudo em **Aprovações**.
+- **Claude, Imagens, Veo e Seedance:** uma aba para usar cada IA diretamente.
+- **Início, Ideias e textos, Perfis e redes:** resumo do dia, banco de ideias, hashtags salvas e cadastro dos perfis.
 - **Aprovações:** você aprova, pede ajuste (que volta para o gerente) ou reprova cada peça.
 - **Agendamentos:** calendário próprio com o que está *a programar*, *programado*, *postado* ou *cancelado*. Não depende do Metricool.
 - **Mídias:** biblioteca com todas as imagens e vídeos (dá para enviar os seus também).
