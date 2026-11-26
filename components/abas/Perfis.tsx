@@ -6,6 +6,7 @@ import { useStore } from "@/lib/store";
 import { CORES, type Marca } from "@/lib/tipos";
 import Icone, { Avatar } from "../Icone";
 import { CartaoMetricool, LinhaCota } from "../Metricool";
+import ManualMarca from "../ManualMarca";
 
 const REDES_CONEXAO: { chave: keyof Marca["redes"]; nome: string }[] = [
   { chave: "instagram", nome: "Instagram" },
@@ -14,7 +15,7 @@ const REDES_CONEXAO: { chave: keyof Marca["redes"]; nome: string }[] = [
   { chave: "youtube", nome: "YouTube" },
 ];
 
-export default function Perfis() {
+export default function Perfis({ falarComGerente }: { falarComGerente: (t: string) => void }) {
   const store = useStore();
   const { conta, marca, editarMarca, removerMarca, editarConta, removerConta, raiz, ocupado } = store;
   const [perfil, setPerfil] = useState(marca.perfil);
@@ -85,6 +86,8 @@ export default function Perfis() {
           </button>
         </div>
       </div>
+
+      <ManualMarca key={marca.id} falarComGerente={falarComGerente} />
 
       {store.nuvem && <CartaoInstagram />}
 

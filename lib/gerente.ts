@@ -94,6 +94,12 @@ Antes de montar um planejamento ou campanha, pergunte (na mesma mensagem do brie
 Se a ferramenta disser que o perfil não publica sozinho, não pergunte: avise em uma linha e siga como na opção 3.
 Na tabela do planejamento, a coluna "Publicação" diz "Automática" ou "Manual". Nunca marque como automática mais peças do que o limite que resta no mês. Ao enviar cada peça para aprovação, informe publicar_automatico conforme o combinado.
 
+## Guia da marca
+O perfil pode trazer um "Guia da marca" (montado a partir do manual em PDF do usuário). Siga-o em tudo: tom de voz, palavras, cores, fontes, estilo de imagem e de vídeo, regras.
+Quando o usuário enviar o manual ou disser que faltam informações no guia, faça uma entrevista curta para completar o que falta: no máximo 5 perguntas por mensagem, das mais importantes para as menos (nome e o que a empresa faz, público, tom de voz, cores e logo, produtos e diferenciais, estilo de conteúdo, regras), cada uma com uma sugestão sua entre parênteses quando fizer sentido. Aceite "não sei" e siga em frente.
+A cada rodada de respostas, salve o guia completo e atualizado com salvar_guia_da_marca (sempre o texto inteiro, organizado nas mesmas seções, até ~5.000 caracteres) e diga em uma linha o que foi salvo. Quando estiver completo, diga que o guia está pronto e sugira o próximo passo (por exemplo, o planejamento do mês).
+Nunca invente informações da empresa no guia: o que não foi dito fica como "a definir".
+
 Formatos: feed 4:5 ou 1:1; stories e reels 9:16. No fim de cada entrega, resuma em poucas linhas o que foi feito e o que espera aprovação.
 O perfil da marca chega em mensagens de sistema ao longo da conversa; vale sempre o mais recente.`;
 
@@ -191,6 +197,16 @@ export const FERRAMENTAS: Anthropic.Beta.BetaTool[] = [
     name: "listar_agendamentos",
     description: "Mostra o que já está aprovado/programado/postado no calendário e o que está esperando aprovação.",
     input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "salvar_guia_da_marca",
+    description:
+      "Salva o Guia da marca do perfil (substitui o anterior). Envie sempre o guia completo em markdown, com as seções: Empresa, Público, Tom de voz, Identidade visual, Produtos e diferenciais, Conteúdo e formatos, Estilo de vídeo, Regras, Exemplos aprovados, A definir.",
+    input_schema: {
+      type: "object",
+      properties: { guia: { type: "string", description: "Guia completo em markdown (até ~5.000 caracteres)" } },
+      required: ["guia"],
+    },
   },
   {
     name: "ver_publicacao_automatica",
@@ -366,6 +382,13 @@ async function executar(
       case "ver_publicacao_automatica":
         return ok(await resumoPublicacaoParaGerente(store));
 
+      case "salvar_guia_da_marca": {
+        const guia = String(entrada.guia ?? "").trim().slice(0, 8000);
+        if (!guia) return erro("O guia veio vazio.");
+        store.editarMarca(store.marca.id, { guia });
+        return ok("Guia da marca salvo no perfil. Ele passa a valer em todas as próximas criações.");
+      }
+
       case "listar_agendamentos": {
         const { agendamentos, aprovacoes } = store.obter();
         const resumo = {
@@ -470,6 +493,8 @@ function descreverEtapa(b: Anthropic.Beta.BetaToolUseBlock): string {
       return `Enviando para aprovação: ${e.titulo ?? ""}...`;
     case "ver_publicacao_automatica":
       return "Conferindo a publicação automática do plano...";
+    case "salvar_guia_da_marca":
+      return "Salvando o guia da marca...";
     case "buscar_biblioteca":
       return `Procurando na biblioteca${e.consulta ? `: "${e.consulta}"` : ""}...`;
     case "ver_biblioteca":

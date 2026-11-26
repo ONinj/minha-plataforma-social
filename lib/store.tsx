@@ -42,7 +42,7 @@ type Contexto = {
   editarConta: (id: string, dados: Partial<Pick<Conta, "nome" | "email" | "cor">>) => void;
   removerConta: (id: string) => void;
   criarMarca: (dados: { nome: string; arroba: string }) => void;
-  editarMarca: (id: string, dados: Partial<Pick<Marca, "nome" | "arroba" | "cor" | "perfil" | "redes">>) => void;
+  editarMarca: (id: string, dados: Partial<Pick<Marca, "nome" | "arroba" | "cor" | "perfil" | "redes" | "guia" | "guiaArquivo">>) => void;
   removerMarca: (id: string) => void;
   // Trava a troca de perfil enquanto o gerente trabalha
   ocupado: boolean;
@@ -519,7 +519,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [definirRaiz, nuvem, avisar],
   );
   const editarMarca = useCallback(
-    (id: string, dados: Partial<Pick<Marca, "nome" | "arroba" | "cor" | "perfil" | "redes">>) => {
+    (id: string, dados: Partial<Pick<Marca, "nome" | "arroba" | "cor" | "perfil" | "redes" | "guia" | "guiaArquivo">>) => {
       const { conta } = ativos(ref.current);
       definirRaiz(
         mudarConta(ref.current, conta.id, (c) => ({

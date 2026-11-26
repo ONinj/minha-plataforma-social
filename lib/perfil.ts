@@ -1,9 +1,10 @@
 import type { MensagemClaude } from "./tipos";
 
 /** Nome, @ e descrição do perfil ativo, no formato que o Claude recebe. */
-export function textoDoPerfil(store: { marca: { nome: string; arroba: string; perfil: string } }): string {
-  const { nome, arroba, perfil } = store.marca;
-  return `Perfil: ${nome}${arroba ? ` (@${arroba})` : ""}\n${perfil.trim() || "(descrição ainda não preenchida)"}`;
+export function textoDoPerfil(store: { marca: { nome: string; arroba: string; perfil: string; guia?: string } }): string {
+  const { nome, arroba, perfil, guia } = store.marca;
+  const base = `Perfil: ${nome}${arroba ? ` (@${arroba})` : ""}\n${perfil.trim() || "(descrição ainda não preenchida)"}`;
+  return guia?.trim() ? `${base}\n\nGuia da marca (siga em tudo o que criar):\n${guia.trim()}` : base;
 }
 
 const PREFIXO = "Perfil da marca / redes do usuário (atualizado):\n";

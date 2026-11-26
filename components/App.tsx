@@ -391,7 +391,7 @@ function Plataforma() {
             />
           )}
           {aba === "ideias" && <Ideias falarComGerente={falarComGerente} />}
-          {aba === "perfis" && <Perfis />}
+          {aba === "perfis" && <Perfis falarComGerente={falarComGerente} />}
           {aba === "config" && <Configuracoes />}
           {aba === "plano" && nuvem && <Plano />}
           {aba === "admin" && nuvem?.usuario.admin && <Admin />}

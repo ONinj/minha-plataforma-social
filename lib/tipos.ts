@@ -124,6 +124,10 @@ export type Marca = {
   cor: string;
   /** Texto do perfil da marca (nicho, público, tom de voz...) usado pelo gerente. */
   perfil: string;
+  /** Guia da marca montado pelo gerente a partir do manual (PDF) e das respostas do usuário. */
+  guia?: string;
+  /** Manual em PDF que originou o guia. */
+  guiaArquivo?: { nome: string; em: string };
   redes: { instagram?: string; tiktok?: string; facebook?: string; youtube?: string };
   criadoEm: string;
   midias: Midia[];
