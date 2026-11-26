@@ -1,0 +1,24 @@
+<svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+      <defs>
+        <linearGradient id="galhos-caule" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#c4b5fd" />
+          <stop offset="0.45" stop-color="#8b5cf6" />
+          <stop offset="1" stop-color="#5b21b6" />
+        </linearGradient>
+        <linearGradient id="galhos-folha" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#7c3aed" />
+          <stop offset="1" stop-color="#c4b5fd" />
+        </linearGradient>
+      </defs>
+      <rect width="32" height="32" rx="8" fill="#1d1235" />
+      <rect x="0.5" y="0.5" width="31" height="31" rx="7.5" fill="none" stroke="#8b5cf6" stroke-opacity="0.35" />
+      <g transform="rotate(10 16 17)">
+        <rect x="13.9" y="20.4" width="4.2" height="8.4" rx="1.8" fill="url(#galhos-caule)" />
+        <rect x="13.9" y="14" width="4.2" height="5.8" rx="1.8" fill="url(#galhos-caule)" />
+        <rect x="13.9" y="8" width="4.2" height="5.4" rx="1.8" fill="url(#galhos-caule)" />
+        <rect x="13.4" y="19.7" width="5.2" height="1.1" rx="0.5" fill="#4c1d95" />
+        <rect x="13.4" y="13.3" width="5.2" height="1.1" rx="0.5" fill="#4c1d95" />
+      </g>
+      <path d="M17.2 9 C 18.2 4.8, 22.4 2.4, 26.8 3 C 25.6 7.2, 21.4 9.6, 17.2 9 Z" fill="url(#galhos-folha)" />
+      <path d="M17.9 8.4 C 20.4 6.4, 23.2 4.6, 26 3.6" stroke="#3b0f7a" stroke-width="0.7" fill="none" stroke-linecap="round" />
+    </svg>

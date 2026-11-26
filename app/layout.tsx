@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Central Social",
+  title: "Galhos",
   description: "Plataforma pessoal de gestão de redes sociais com Claude, Gemini, Veo e Seedance.",
 };
 

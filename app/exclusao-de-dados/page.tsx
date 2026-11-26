@@ -1,6 +1,6 @@
 import PaginaTexto from "@/components/PaginaTexto";
 
-export const metadata = { title: "Exclusão de dados · Central Social" };
+export const metadata = { title: "Exclusão de dados · Galhos" };
 
 const contato = process.env.NEXT_PUBLIC_EMAIL_CONTATO || "o canal de atendimento informado na plataforma";
 
@@ -9,7 +9,7 @@ export default function ExclusaoDeDados() {
     <PaginaTexto titulo="Como excluir seus dados">
       <h3>Desconectar o Instagram</h3>
       <ol>
-        <li>Entre na Central Social e abra Perfis e redes.</li>
+        <li>Entre na Galhos e abra Perfis e redes.</li>
         <li>No cartão “Publicação automática no Instagram”, clique em Desconectar. O token de acesso é apagado na hora.</li>
         <li>
           Se quiser, remova também o acesso pelo próprio Instagram: Configurações → Segurança → Apps e sites → remova a Central

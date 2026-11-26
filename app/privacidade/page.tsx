@@ -1,6 +1,6 @@
 import PaginaTexto from "@/components/PaginaTexto";
 
-export const metadata = { title: "Política de privacidade · Central Social" };
+export const metadata = { title: "Política de privacidade · Galhos" };
 
 const contato = process.env.NEXT_PUBLIC_EMAIL_CONTATO || "o canal de atendimento informado na plataforma";
 
@@ -8,9 +8,9 @@ export default function Privacidade() {
   return (
     <PaginaTexto titulo="Política de privacidade">
       <p>Última atualização: novembro de 2026.</p>
-      <h3>O que é a Central Social</h3>
+      <h3>O que é a Galhos</h3>
       <p>
-        A Central Social é uma plataforma para planejar, criar e publicar conteúdo em redes sociais com ajuda de inteligência
+        A Galhos é uma plataforma para planejar, criar e publicar conteúdo em redes sociais com ajuda de inteligência
         artificial. Esta política explica quais dados usamos e por quê.
       </p>
       <h3>Dados que coletamos</h3>

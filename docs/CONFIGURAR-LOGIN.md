@@ -31,12 +31,12 @@ Agora o botão fica escondido até você ligar.
 
 ### 3.1 Google Cloud
 1. Entre em **console.cloud.google.com** com o seu Gmail.
-2. No topo, **Selecionar projeto → Novo projeto** → nome "Central Social" → Criar. Selecione o projeto.
+2. No topo, **Selecionar projeto → Novo projeto** → nome "Galhos" → Criar. Selecione o projeto.
 3. Menu ☰ → **APIs e serviços → Tela de consentimento OAuth** (ou "Google Auth Platform").
-   - **Começar** → Nome do app: Central Social; e-mail de suporte: o seu.
+   - **Começar** → Nome do app: Galhos; e-mail de suporte: o seu.
    - Público: **Externo**. Contato: o seu e-mail. Aceite e **Criar**.
 4. Menu → **Clientes** (ou "Credenciais → Criar credenciais → ID do cliente OAuth"):
-   - Tipo: **Aplicativo da Web**. Nome: Central Social.
+   - Tipo: **Aplicativo da Web**. Nome: Galhos.
    - **Origens JavaScript autorizadas**: `https://SEU-SITE.vercel.app`
    - **URIs de redirecionamento autorizados**: cole o endereço que o Supabase mostra no passo 3.2
      (é parecido com `https://xxxxx.supabase.co/auth/v1/callback`).

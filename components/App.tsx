@@ -22,6 +22,7 @@ import Inicio from "./abas/Inicio";
 import Midias from "./abas/Midias";
 import Perfis from "./abas/Perfis";
 import Video from "./abas/Video";
+import Logo from "./Logo";
 import Icone, { Avatar } from "./Icone";
 import ModalFormulario from "./ModalFormulario";
 
@@ -161,7 +162,7 @@ function Plataforma() {
   // Mostra no título da aba do navegador quantos vídeos estão sendo feitos.
   const qtdGerando = conta.marcas.reduce((n, m) => n + m.midias.filter((x) => x.status === "gerando").length, 0);
   useEffect(() => {
-    document.title = qtdGerando ? `⏳ ${qtdGerando} vídeo(s) em produção · Central Social` : "Central Social";
+    document.title = qtdGerando ? `⏳ ${qtdGerando} vídeo(s) em produção · Galhos` : "Galhos";
   }, [qtdGerando]);
 
   useEffect(() => {
@@ -223,11 +224,9 @@ function Plataforma() {
       <div className={`fundo-celular ${menuAberto ? "aberto" : ""}`} onClick={() => setMenuAberto(false)} />
       <nav className={`lateral ${menuAberto ? "aberta" : ""}`}>
         <div className="logo">
-          <span className="logo-marca">
-            <Icone nome="raio" tamanho={16} />
-          </span>
+          <Logo tamanho={30} />
           <div>
-            Central Social
+            Galhos
             <small>Estúdio de conteúdo com IA</small>
           </div>
         </div>

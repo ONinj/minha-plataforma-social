@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/nuvem";
 import { urlSupabase } from "@/lib/supabaseUrl";
-import Icone from "./Icone";
+import Logo from "./Logo";
 
 type Modo = "entrar" | "criar" | "link" | "esqueci";
 
@@ -105,11 +105,9 @@ export default function Login() {
     <div className="tela-login">
       <div className="login-caixa">
         <div className="logo" style={{ justifyContent: "center", padding: 0, marginBottom: 18 }}>
-          <span className="logo-marca">
-            <Icone nome="raio" tamanho={16} />
-          </span>
+          <Logo tamanho={30} />
           <div>
-            Central Social
+            Galhos
             <small>Estúdio de conteúdo com IA</small>
           </div>
         </div>

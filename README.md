@@ -1,4 +1,4 @@
-# Central Social
+# Galhos
 
 Plataforma para social medias gerenciarem vários perfis com IA num lugar só. Organização: **contas** (a pessoa ou agência, com as próprias chaves e gastos) → **perfis** (cada marca/cliente, com conversas, mídias, aprovações e calendário próprios).
 

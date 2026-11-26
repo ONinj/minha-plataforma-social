@@ -8,7 +8,7 @@ Depois faça o mesmo com `supabase/migrations/003_metricool.sql`.
 
 ## 2. App na Meta (20 min)
 1. Entre em **developers.facebook.com** com o seu Facebook → **My Apps → Create App**.
-2. Caso de uso: **Manage messaging & content on Instagram** (API do Instagram). Tipo: **Business**. Dê um nome (ex.: Central Social).
+2. Caso de uso: **Manage messaging & content on Instagram** (API do Instagram). Tipo: **Business**. Dê um nome (ex.: Galhos).
 3. No painel do app: **Instagram → API setup with Instagram login**.
 4. Em **Set up Instagram business login → Business login settings**:
    - **OAuth redirect URIs**: `https://SEU-SITE.vercel.app/api/instagram/retorno`

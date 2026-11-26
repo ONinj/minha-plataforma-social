@@ -108,7 +108,7 @@ export default function Plano() {
 
   const st = STATUS[n.conta.status] ?? STATUS.ativo;
   const proporcao = n.plano.creditos_mensais ? Math.min(100, (n.conta.saldo / n.plano.creditos_mensais) * 100) : 0;
-  const zap = n.whatsapp ? `https://wa.me/${n.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent("Olá! Quero saber do plano Empresa da Central Social.")}` : null;
+  const zap = n.whatsapp ? `https://wa.me/${n.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent("Olá! Quero saber do plano Empresa da Galhos.")}` : null;
 
   return (
     <div className="conteudo">

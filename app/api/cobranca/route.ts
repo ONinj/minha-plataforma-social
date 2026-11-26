@@ -42,7 +42,7 @@ export async function POST(req: Request) {
         value: Number(plano.preco),
         nextDueDate: hoje(),
         cycle: "MONTHLY",
-        description: `Central Social · Plano ${plano.nome}`,
+        description: `Galhos · Plano ${plano.nome}`,
         externalReference: `assinatura:${ctx.conta.id}:${plano.id}`,
       });
       await db`update contas set asaas_assinatura_pendente = ${sub.id}, plano_pendente = ${plano.id} where id = ${ctx.conta.id}::uuid`;
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         billingType: "UNDEFINED",
         value: valorRecarga(pacote.valor, ctx.recursos.desconto_recarga),
         dueDate: hoje(),
-        description: `Central Social · Recarga de ${pacote.nome}`,
+        description: `Galhos · Recarga de ${pacote.nome}`,
         externalReference: `recarga:${ctx.conta.id}:${c.pacote}`,
       });
       return Response.json({ url: pag.invoiceUrl });
