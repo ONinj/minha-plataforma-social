@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { chamarClaude } from "@/lib/servicos";
 import { useStore } from "@/lib/store";
+import CriarPerfil from "./CriarPerfil";
 import Icone from "./Icone";
 
 const LIMITE_MB = 3;
@@ -35,6 +36,56 @@ function paraBase64(arquivo: File): Promise<string> {
   });
 }
 
+type Store = ReturnType<typeof useStore>;
+
+/** Lê o manual em PDF, salva o guia no perfil e manda o gerente perguntar o que falta. Devolve true se deu certo. */
+export async function lerManualPdf(store: Store, arquivo: File, falarComGerente: (t: string) => void): Promise<boolean> {
+  const marca = store.marca;
+  if (arquivo.type !== "application/pdf" && !arquivo.name.toLowerCase().endsWith(".pdf")) {
+    store.avisar("Envie o manual em PDF.", "erro");
+    return false;
+  }
+  if (arquivo.size > LIMITE_MB * 1024 * 1024) {
+    store.avisar(`O PDF tem mais de ${LIMITE_MB} MB. Salve uma versão mais leve (menos imagens ou "reduzir tamanho") e envie de novo.`, "erro");
+    return false;
+  }
+  try {
+    const dados = await paraBase64(arquivo);
+    const r = await chamarClaude(store, {
+      system: SISTEMA,
+      modelo: "claude-sonnet-5-5",
+      uso: "Manual da marca",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "document", source: { type: "base64", media_type: "application/pdf", data: dados } },
+            { type: "text", text: `Manual do perfil "${marca.nome}". Monte o guia e a lista do que falta.` },
+          ],
+        },
+      ],
+    });
+    const bruto = r.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+    const res = JSON.parse(bruto.slice(bruto.indexOf("{"), bruto.lastIndexOf("}") + 1)) as { guia?: string; faltando?: string[]; modelo_em_branco?: boolean };
+    const guia = String(res.guia ?? "").trim();
+    store.editarMarca(marca.id, { guia, guiaArquivo: { nome: arquivo.name, em: new Date().toISOString() } });
+    const faltando = (res.faltando ?? []).filter(Boolean);
+    store.avisar("Manual lido! O gerente vai te fazer algumas perguntas para completar o guia.", "ok");
+    falarComGerente(
+      res.modelo_em_branco
+        ? `Enviei o manual-modelo da marca "${marca.nome}", ainda sem as respostas. Me entreviste para montar o guia da marca do zero, começando pelo mais importante, e salve o guia a cada rodada.`
+        : `Enviei o manual da marca "${marca.nome}" (${arquivo.name}) e o guia já está salvo no perfil.` +
+            (faltando.length
+              ? ` Ficaram faltando estas informações:\n${faltando.map((f) => `- ${f}`).join("\n")}\nMe pergunte o que falta (em rodadas curtas) e atualize o guia com as minhas respostas.`
+              : " Confira se ficou tudo certo e me diga se falta alguma coisa importante."),
+    );
+    return true;
+  } catch (e) {
+    store.avisar(`Não consegui ler o manual: ${e instanceof Error ? e.message : e}`, "erro");
+    return false;
+  }
+}
+
 /** Perfis e redes → Manual da marca: o gerente lê o PDF, monta o guia e entrevista o usuário sobre o que falta. */
 export default function ManualMarca({ falarComGerente }: { falarComGerente: (t: string) => void }) {
   const store = useStore();
@@ -44,54 +95,12 @@ export default function ManualMarca({ falarComGerente }: { falarComGerente: (t: 
   const [editando, setEditando] = useState(false);
   const [texto, setTexto] = useState(marca.guia ?? "");
   const [copiado, setCopiado] = useState(false);
+  const [questionario, setQuestionario] = useState(false);
 
   async function enviar(arquivo: File) {
-    if (arquivo.type !== "application/pdf" && !arquivo.name.toLowerCase().endsWith(".pdf")) {
-      store.avisar("Envie o manual em PDF.", "erro");
-      return;
-    }
-    if (arquivo.size > LIMITE_MB * 1024 * 1024) {
-      store.avisar(`O PDF tem mais de ${LIMITE_MB} MB. Salve uma versão mais leve (menos imagens ou "reduzir tamanho") e envie de novo.`, "erro");
-      return;
-    }
     setLendo(true);
-    try {
-      const dados = await paraBase64(arquivo);
-      const r = await chamarClaude(store, {
-        system: SISTEMA,
-        modelo: "claude-sonnet-5-5",
-        uso: "Manual da marca",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "document", source: { type: "base64", media_type: "application/pdf", data: dados } },
-              { type: "text", text: `Manual do perfil "${marca.nome}". Monte o guia e a lista do que falta.` },
-            ],
-          },
-        ],
-      });
-      const bruto = r.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-      const json = bruto.slice(bruto.indexOf("{"), bruto.lastIndexOf("}") + 1);
-      const res = JSON.parse(json) as { guia?: string; faltando?: string[]; modelo_em_branco?: boolean };
-      const guia = String(res.guia ?? "").trim();
-      store.editarMarca(marca.id, { guia, guiaArquivo: { nome: arquivo.name, em: new Date().toISOString() } });
-      setTexto(guia);
-      const faltando = (res.faltando ?? []).filter(Boolean);
-      store.avisar("Manual lido! O gerente vai te fazer algumas perguntas para completar o guia.", "ok");
-      falarComGerente(
-        res.modelo_em_branco
-          ? `Enviei o manual-modelo da marca "${marca.nome}", ainda sem as respostas. Me entreviste para montar o guia da marca do zero, começando pelo mais importante, e salve o guia a cada rodada.`
-          : `Enviei o manual da marca "${marca.nome}" (${arquivo.name}) e o guia já está salvo no perfil.` +
-              (faltando.length
-                ? ` Ficaram faltando estas informações:\n${faltando.map((f) => `- ${f}`).join("\n")}\nMe pergunte o que falta (em rodadas curtas) e atualize o guia com as minhas respostas.`
-                : " Confira se ficou tudo certo e me diga se falta alguma coisa importante."),
-      );
-    } catch (e) {
-      store.avisar(`Não consegui ler o manual: ${e instanceof Error ? e.message : e}`, "erro");
-    } finally {
-      setLendo(false);
-    }
+    await lerManualPdf(store, arquivo, falarComGerente);
+    setLendo(false);
   }
 
   return (
@@ -118,16 +127,8 @@ export default function ManualMarca({ falarComGerente }: { falarComGerente: (t: 
         <button className="botao" disabled={lendo} onClick={() => input.current?.click()}>
           {lendo ? "Lendo o manual..." : marca.guia ? "Enviar outro manual (PDF)" : "Enviar manual da marca (PDF)"}
         </button>
-        <button
-          className="botao sec"
-          disabled={lendo}
-          onClick={() =>
-            falarComGerente(
-              `Quero montar o guia da marca do perfil "${marca.nome}". Me entreviste em rodadas curtas (empresa, público, tom de voz, cores e logo, produtos, estilo de conteúdo e de vídeo, regras) e salve o guia a cada rodada.`,
-            )
-          }
-        >
-          Não tenho manual: responder perguntas
+        <button className="botao sec" disabled={lendo} onClick={() => setQuestionario(true)}>
+          {marca.respostasPerfil ? "Refazer o questionário" : "Não tenho manual: responder o questionário"}
         </button>
         <a className="botao sec" href="/manual-da-marca-galhos.pdf" target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
           <Icone nome="baixar" tamanho={15} /> Baixar modelo de manual
@@ -150,6 +151,14 @@ export default function ManualMarca({ falarComGerente }: { falarComGerente: (t: 
           <Icone nome="copiar" tamanho={14} /> {copiado ? "Copiado!" : "Copiar pedido"}
         </button>
       </details>
+
+      {questionario && (
+        <div className="modal-fundo" style={{ alignItems: "flex-start", overflowY: "auto", padding: "24px 12px" }}>
+          <div style={{ width: "100%", maxWidth: 760 }}>
+            <CriarPerfil falarComGerente={falarComGerente} aoFechar={() => setQuestionario(false)} />
+          </div>
+        </div>
+      )}
 
       {marca.guia && (
         <div style={{ marginTop: 14 }}>

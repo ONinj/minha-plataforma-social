@@ -128,6 +128,8 @@ export type Marca = {
   guia?: string;
   /** Manual em PDF que originou o guia. */
   guiaArquivo?: { nome: string; em: string };
+  /** Respostas do questionário "Criar perfil da marca" (para refazer depois). */
+  respostasPerfil?: Record<string, string | string[]>;
   redes: { instagram?: string; tiktok?: string; facebook?: string; youtube?: string };
   criadoEm: string;
   midias: Midia[];

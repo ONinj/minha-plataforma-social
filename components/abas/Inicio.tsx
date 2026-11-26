@@ -6,6 +6,8 @@ import { brl } from "@/lib/util";
 import type { IdAba } from "../App";
 import Icone, { Avatar } from "../Icone";
 import { CartaoMidia } from "../MidiaView";
+import CriarPerfil from "../CriarPerfil";
+import { useEffect, useState } from "react";
 
 function saudacao() {
   const h = new Date().getHours();
@@ -15,6 +17,17 @@ function saudacao() {
 export default function Inicio({ ir, falarComGerente }: { ir: (a: IdAba) => void; falarComGerente: (t: string) => void }) {
   const store = useStore();
   const { estado, conta, marca, trocarMarca, ocupado } = store;
+  // Perfil novo (sem guia nem descrição): começa pelo questionário da marca.
+  const [pulado, setPulado] = useState(true);
+  useEffect(() => {
+    try {
+      setPulado(localStorage.getItem(`perfil-pulado:${marca.id}`) === "1");
+    } catch {
+      setPulado(false);
+    }
+  }, [marca.id]);
+  const [forcar, setForcar] = useState(false);
+  const precisaPerfil = !marca.guia?.trim() && (forcar || (!marca.perfil.trim() && !pulado));
   const agora = new Date();
   const em7 = new Date(agora.getTime() + 7 * 864e5);
   const proximos = estado.agendamentos
@@ -44,8 +57,46 @@ export default function Inicio({ ir, falarComGerente }: { ir: (a: IdAba) => void
     { titulo: "Anotar ideia", sub: "Guarde para depois", icone: "ideia", fazer: () => ir("ideias") },
   ];
 
+  if (precisaPerfil) {
+    return (
+      <div className="conteudo">
+        <CriarPerfil
+          key={marca.id}
+          falarComGerente={falarComGerente}
+          aoFechar={() => {
+            try {
+              localStorage.setItem(`perfil-pulado:${marca.id}`, "1");
+            } catch {}
+            setPulado(true);
+            setForcar(false);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="conteudo">
+      {!marca.guia?.trim() && (
+        <div className="cartao linha" style={{ marginBottom: 16, justifyContent: "space-between", borderColor: "rgba(139,92,246,.45)" }}>
+          <span>
+            <b>✨ Complete o perfil da marca</b>
+            <span className="ajuda" style={{ display: "block", margin: 0 }}>7 etapas rápidas para o gerente acertar o tom, as cores e o estilo.</span>
+          </span>
+          <button
+            className="botao peq"
+            onClick={() => {
+              try {
+                localStorage.removeItem(`perfil-pulado:${marca.id}`);
+              } catch {}
+              setPulado(false);
+              setForcar(true);
+            }}
+          >
+            {marca.perfil.trim() ? "Responder o questionário" : "Continuar"}
+          </button>
+        </div>
+      )}
       <div className="linha" style={{ alignItems: "flex-start", justifyContent: "space-between" }}>
         <div>
           <p className="ajuda" style={{ margin: 0 }}>
