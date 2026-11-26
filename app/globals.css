@@ -114,6 +114,7 @@ a { color: var(--destaque-2); }
 .topo {
   display: flex; align-items: center; gap: 14px; padding: 14px 28px; border-bottom: 1px solid var(--borda);
   background: rgba(7, 8, 13, 0.55); backdrop-filter: blur(16px);
+  position: relative; z-index: 30; /* o menu da conta abre por cima do conteúdo */
 }
 .topo h1 { margin: 0; font-size: 18px; letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px; }
 .topo .migalha { font-size: 12.5px; color: var(--texto-3); display: flex; align-items: center; gap: 6px; }
