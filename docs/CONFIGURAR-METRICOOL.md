@@ -6,7 +6,7 @@ Quando você colocar, a publicação automática liga sozinha.
 Existem dois jeitos, e os dois podem funcionar ao mesmo tempo:
 
 - **Metricool da plataforma (o seu):** você assina o Metricool Advanced, cria uma "marca" para cada cliente e
-  liga cada perfil da plataforma à marca dele. Vale para os planos com publicação automática (Premium e Empresa).
+  liga cada perfil da plataforma à marca dele. Vale para todos os planos pagos (Essencial e Profissional com limite mensal; Premium e Empresa sem limite).
 - **Metricool próprio do cliente:** quem já assina o Metricool Advanced coloca o userId e o token dele em
   **Configurações → Meu próprio Metricool**. Funciona em qualquer plano (o cliente já paga o Metricool dele).
 
@@ -40,7 +40,7 @@ Vercel → **Settings → Environment Variables**. Se ainda não existir, crie:
    do Metricool (na marca, a opção de convidar/enviar link para conectar as redes). Copie esse link.
 3. Na plataforma: **Administração → Gerenciar** (na conta do cliente) → parte **Metricool** →
    escolha a marca de cada perfil e, se quiser, cole o link de conexão → **Salvar**.
-4. Confira se a conta do cliente está num plano com publicação automática (Premium ou Empresa).
+4. Confira se a conta do cliente está num plano pago e se ainda cabe mais um perfil com publicação no plano dele.
 
 Pronto. O cliente vê em **Perfis e redes**: "✅ Pronto para publicar sozinho" e o botão para (re)conectar as redes.
 

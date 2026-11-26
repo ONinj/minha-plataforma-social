@@ -18,7 +18,8 @@ Ele atualiza os preços e benefícios dos planos, cria o registro de pagamentos 
 | Seedance | até 480p | até 720p | até 1080p | até 1080p |
 | Biblioteca de referências | ✓ | ✓ | ✓ | ✓ |
 | Importar do Google Drive | — | ✓ | ✓ | ✓ |
-| Publicação automática (Metricool da plataforma) | — | — | ✓ | ✓ |
+| Publicação automática por mês, por perfil | 4 reels, 8 stories, 4 posts | 8 reels, 16 stories, 12 posts | sem limite | sem limite |
+| Perfis com publicação automática | 1 | 3 | 15 | 50 |
 | Sobra de créditos que acumula | até 25% | até 50% | até 100% | até 100% |
 | Desconto nas recargas | — | 5% | 10% | 15% |
 | Atendimento | e-mail | WhatsApp | WhatsApp prioritário | dedicado |
@@ -31,6 +32,15 @@ O resto paga as taxas do Asaas, impostos, servidores e o seu lucro. Na prática,
 
 Quem já assina continua pagando o valor antigo até trocar de plano (é o mais justo e evita reclamação).
 Os benefícios novos valem para todos na hora.
+
+## Limite de publicação automática
+Rode `supabase/migrations/006_cota_publicacao.sql` no SQL Editor para ligar.
+- Conta por perfil e por mês do calendário (pela data de publicação). Vira o mês, renova.
+- Só contam as publicações agendadas, publicando ou publicadas. Canceladas e com erro não contam.
+- Quem usa o Metricool próprio não tem limite.
+- Passou do limite: a peça é entregue normalmente para postar manualmente.
+- O gerente pergunta antes de planejar: (1) só o que cabe no plano, (2) campanha completa marcando o que sai sozinho, ou (3) só os arquivos.
+- Os números ficam no banco (tabela planos, campo publicacao_mensal). Para mudar, me peça ou edite no SQL Editor.
 
 ## Painel (Administração)
 - **Visão geral**: alertas, quanto entrou no mês (bruto e líquido), custo de IA, quanto sobrou, receita recorrente,

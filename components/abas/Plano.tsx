@@ -38,7 +38,14 @@ function beneficios(r: RecursosPlano): { texto: string; tem: boolean }[] {
     { texto: r.seedance ? `Seedance até ${res?.length ? res[res.length - 1] : "1080p"}` : "Seedance", tem: !!r.seedance },
     { texto: "Biblioteca de referências", tem: !!r.biblioteca },
     { texto: "Importar do Google Drive", tem: !!r.drive },
-    { texto: "Publicação automática no Instagram", tem: !!r.instagram },
+    {
+      texto: !r.instagram
+        ? "Publicação automática no Instagram"
+        : r.publicacao_mensal
+          ? `Publicação automática: ${r.publicacao_mensal.reels} reels, ${r.publicacao_mensal.stories} stories e ${r.publicacao_mensal.posts} posts por mês${r.perfis_publicacao ? ` (${r.perfis_publicacao} perfi${r.perfis_publicacao > 1 ? "s" : "l"})` : ""}`
+          : `Publicação automática sem limite${r.perfis_publicacao ? ` (até ${r.perfis_publicacao} perfis)` : ""}`,
+      tem: !!r.instagram,
+    },
     { texto: r.acumulo ? `Sobra de créditos acumula até ${pct(r.acumulo)} do plano` : "Créditos acumulam para o mês seguinte", tem: !!r.acumulo },
     { texto: r.desconto_recarga ? `${pct(r.desconto_recarga)} de desconto nas recargas` : "Desconto nas recargas", tem: !!r.desconto_recarga },
     ...(r.extras ?? []).map((t) => ({ texto: t, tem: true })),

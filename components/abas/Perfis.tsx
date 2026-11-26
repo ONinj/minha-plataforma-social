@@ -5,7 +5,7 @@ import { atualizarConexoes, conectarInstagram, desconectarInstagram, useInstagra
 import { useStore } from "@/lib/store";
 import { CORES, type Marca } from "@/lib/tipos";
 import Icone, { Avatar } from "../Icone";
-import { CartaoMetricool } from "../Metricool";
+import { CartaoMetricool, LinhaCota } from "../Metricool";
 
 const REDES_CONEXAO: { chave: keyof Marca["redes"]; nome: string }[] = [
   { chave: "instagram", nome: "Instagram" },
@@ -179,7 +179,7 @@ function CartaoInstagram() {
         <CartaoMetricool />
       ) : !ig.noPlano ? (
         <div className="linha" style={{ justifyContent: "space-between" }}>
-          <span className="ajuda">🔒 Publicar sozinho no Instagram na hora marcada faz parte do plano Premium (ou use o seu próprio Metricool em Configurações).</span>
+          <span className="ajuda">🔒 Publicar sozinho no Instagram na hora marcada faz parte dos planos pagos (ou use o seu próprio Metricool em Configurações).</span>
           <span className="ajuda">Veja em Plano e créditos.</span>
         </div>
       ) : !ig.configurado ? (
@@ -191,6 +191,7 @@ function CartaoInstagram() {
             <span className="ajuda" style={{ display: "block", fontSize: 12 }}>
               A conexão se renova sozinha. No calendário, ative &quot;Publicar automaticamente&quot; em cada post.
             </span>
+            <LinhaCota />
           </span>
           <button
             className="botao perigo peq"

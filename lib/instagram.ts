@@ -84,6 +84,7 @@ export async function agendarNoInstagram(store: Store, a: Agendamento, opcoes: {
         : x,
     ),
   }));
+  void carregarCota(store.marca.id);
   return r.status;
 }
 
@@ -95,6 +96,7 @@ export async function cancelarNoInstagram(store: Store, id: string) {
       x.id === id ? { ...x, publicarAuto: false, status: "a_programar", publicacao: { status: "cancelada" } } : x,
     ),
   }));
+  void carregarCota(store.marca.id);
 }
 
 /** Traz do servidor a situação das publicações e atualiza o calendário do perfil ativo. */
@@ -187,4 +189,88 @@ export function useInstagram(store: Store) {
     conexao,
     destino,
   };
+}
+
+// ---------------- Limite mensal de publicação automática ----------------
+
+export type Cota = {
+  liberado: boolean;
+  limites: { reels: number; stories: number; posts: number } | null;
+  perfis: number | null;
+  meses: { mes: string; nome: string; usados: { reels: number; stories: number; posts: number } }[];
+};
+const cotas = new Map<string, Cota>();
+const ouvintesCota = new Set<() => void>();
+
+export async function carregarCota(perfilId: string): Promise<Cota | null> {
+  try {
+    const c = await api<Cota>(`/api/publicacoes/cota?perfil=${encodeURIComponent(perfilId)}`);
+    cotas.set(perfilId, c);
+    ouvintesCota.forEach((f) => f());
+    return c;
+  } catch {
+    return null;
+  }
+}
+
+/** Categoria usada no limite: reels, stories ou posts (post, carrossel e outros). */
+export function categoriaDe(tipo: string): "reels" | "stories" | "posts" {
+  return tipo === "reels" ? "reels" : tipo === "story" ? "stories" : "posts";
+}
+
+/** Quanto falta no limite do mês de uma data ("YYYY-MM-DDTHH:mm"), ou null se não há limite. */
+export function restanteNoMes(c: Cota | undefined, tipo: string, data?: string) {
+  if (!c?.limites) return null;
+  const mes = (data ?? new Date().toISOString()).slice(0, 7);
+  const m = c.meses.find((x) => x.mes === mes);
+  const cat = categoriaDe(tipo);
+  const usados = m?.usados[cat] ?? 0;
+  return { cat, usados, limite: c.limites[cat], resta: Math.max(0, c.limites[cat] - usados), nomeMes: m?.nome ?? mes, conhecido: !!m };
+}
+
+export function useCota(store: Store) {
+  const id = store.marca.id;
+  const [, setN] = useState(0);
+  useEffect(() => {
+    if (!store.nuvem) return;
+    const f = () => setN((n) => n + 1);
+    ouvintesCota.add(f);
+    void carregarCota(id);
+    return () => {
+      ouvintesCota.delete(f);
+    };
+  }, [id, store.nuvem]);
+  return cotas.get(id);
+}
+
+/** Resumo para o gerente: se o perfil publica sozinho, por onde, o limite do plano e o uso de cada mês. */
+export async function resumoPublicacaoParaGerente(store: Store): Promise<string> {
+  if (!store.nuvem) return "Publicação automática indisponível neste modo. Entregue as peças para o usuário postar manualmente.";
+  if (!cache) await atualizarConexoes();
+  const n = store.nuvem;
+  const mc = cache?.metricool ?? null;
+  const marca = mc?.marcas.find((m) => m.perfil_id === store.marca.id);
+  const conexao = cache?.conexoes.find((c) => c.perfil_id === store.marca.id);
+  const propria = !!marca && marca.origem === "propria" && mc!.propria;
+  const ligada = propria || (!!n.recursos.instagram && (!!conexao || (!!marca && !!mc?.plataforma)));
+  const cota = await carregarCota(store.marca.id);
+  const linhas: string[] = [];
+  if (!ligada) {
+    linhas.push(
+      n.recursos.instagram
+        ? "Este perfil AINDA NÃO está conectado para publicar sozinho (o usuário conecta em Perfis e redes). Por enquanto, tudo é entregue para postar manualmente."
+        : "O plano atual não tem publicação automática. Tudo é entregue para postar manualmente.",
+    );
+  } else if (propria || !cota?.limites) {
+    linhas.push(`Publicação automática LIGADA${propria ? " (Metricool próprio do usuário)" : ""}, sem limite mensal.`);
+  } else {
+    const l = cota.limites;
+    linhas.push(`Publicação automática LIGADA. Limite do plano por mês neste perfil: ${l.reels} reels, ${l.stories} stories e ${l.posts} posts no feed (carrossel conta como post).`);
+    for (const m of cota.meses) {
+      const u = m.usados;
+      linhas.push(`- ${m.nome}: já agendados ${u.reels}/${l.reels} reels, ${u.stories}/${l.stories} stories, ${u.posts}/${l.posts} posts. Restam ${l.reels - u.reels} reels, ${l.stories - u.stories} stories e ${l.posts - u.posts} posts.`);
+    }
+    linhas.push("O que passar do limite pode ser entregue normalmente para o usuário postar manualmente.");
+  }
+  return linhas.join("\n");
 }

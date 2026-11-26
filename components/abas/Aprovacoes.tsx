@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { agendarNoInstagram, useInstagram } from "@/lib/instagram";
+import { agendarNoInstagram, carregarCota, restanteNoMes, useCota, useInstagram } from "@/lib/instagram";
 import { useStore } from "@/lib/store";
 import { REDES, type Agendamento, type Aprovacao } from "@/lib/tipos";
 import { agoraISO, formatarData, novoId } from "@/lib/util";
@@ -64,7 +64,11 @@ function ItemAprovacao({ item, falarComGerente }: { item: Aprovacao; falarComGer
   const [feedback, setFeedback] = useState("");
   const [pedindoAjuste, setPedindoAjuste] = useState(false);
   const ig = useInstagram(store);
-  const [publicarAuto, setPublicarAuto] = useState(true);
+  const cota = useCota(store);
+  const restante = restanteNoMes(cota, item.tipo, data || undefined);
+  const semEspaco = !!restante && restante.conhecido && restante.resta <= 0;
+  const [publicarAuto, setPublicarAuto] = useState(item.publicarAuto ?? true);
+  const marcado = publicarAuto && !semEspaco;
   const midias = item.midias.map((id) => store.estado.midias.find((m) => m.id === id)).filter(Boolean);
   const aindaGerando = midias.some((m) => m!.status === "gerando");
   const ePlanejamento = item.tipo === "planejamento";
@@ -96,10 +100,13 @@ function ItemAprovacao({ item, falarComGerente }: { item: Aprovacao; falarComGer
       atualizadoEm: agoraISO(),
     };
     store.atualizar((e) => ({ ...e, agendamentos: [...e.agendamentos, agendamento] }));
-    if (ig.destino && publicarAuto && agendamento.midias.length) {
+    if (ig.destino && marcado && agendamento.midias.length) {
       store.avisar("Preparando a publicação automática...", "info");
       agendarNoInstagram(store, agendamento)
-        .then(() => store.avisar(`Agendado para ${formatarData(agendamento.data)} (${ig.destino!.nome}).`, "ok"))
+        .then(() => {
+          store.avisar(`Agendado para ${formatarData(agendamento.data)} (${ig.destino!.nome}).`, "ok");
+          void carregarCota(store.marca.id);
+        })
         .catch((e) => store.avisar(`Não consegui agendar a publicação: ${e instanceof Error ? e.message : e}`, "erro"));
     }
   }
@@ -183,10 +190,20 @@ function ItemAprovacao({ item, falarComGerente }: { item: Aprovacao; falarComGer
             </div>
           )}
           {ig.destino && !ePlanejamento && midias.length > 0 && (
-            <label className="linha" style={{ margin: 0, cursor: "pointer" }}>
-              <input type="checkbox" checked={publicarAuto} onChange={(e) => setPublicarAuto(e.target.checked)} />
-              Publicar automaticamente na data marcada ({ig.destino.nome})
-            </label>
+            <div>
+              <label className="linha" style={{ margin: 0, cursor: semEspaco ? "default" : "pointer" }}>
+                <input type="checkbox" checked={marcado} disabled={semEspaco} onChange={(e) => setPublicarAuto(e.target.checked)} />
+                Publicar automaticamente na data marcada ({ig.destino.nome})
+              </label>
+              {restante && (
+                <span className="ajuda" style={{ fontSize: 12, display: "block", marginLeft: 24, color: semEspaco ? "var(--alerta)" : undefined }}>
+                  {semEspaco
+                    ? `O limite de ${restante.cat} automáticos de ${restante.nomeMes} já foi usado (${restante.limite}). Este fica para postar manualmente.`
+                    : `${restante.cat[0].toUpperCase() + restante.cat.slice(1)} automáticos em ${restante.nomeMes}: ${restante.usados} de ${restante.limite} usados.`}
+                  {item.publicarAuto === false && !semEspaco && " O gerente sugeriu postar este manualmente."}
+                </span>
+              )}
+            </div>
           )}
           <div className="linha">
             <button className="botao ok" onClick={aprovar} disabled={aindaGerando} title={aindaGerando ? "Espere o vídeo ficar pronto" : ""}>

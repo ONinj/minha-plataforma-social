@@ -35,6 +35,8 @@ export type InfoNuvem = {
     acumulo?: number;
     desconto_recarga?: number;
     extras?: string[];
+    publicacao_mensal?: { reels: number; stories: number; posts: number } | null;
+    perfis_publicacao?: number;
   };
   cambio: number;
   precos: {

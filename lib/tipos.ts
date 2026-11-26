@@ -58,6 +58,8 @@ export type Aprovacao = {
   observacoes?: string;
   status: "pendente" | "aprovado" | "reprovado" | "ajuste";
   feedback?: string;
+  /** Sugestão do gerente: publicar sozinho na data (true) ou o usuário posta manualmente (false). */
+  publicarAuto?: boolean;
   criadoEm: string;
 };
 

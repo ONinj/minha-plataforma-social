@@ -79,6 +79,10 @@ export type Recursos = {
   desconto_recarga?: number;
   /** Benefícios extras mostrados na lista do plano. */
   extras?: string[];
+  /** Publicações automáticas por mês, por perfil (sem = sem limite). */
+  publicacao_mensal?: { reels: number; stories: number; posts: number } | null;
+  /** Quantos perfis podem ter publicação automática pela plataforma. */
+  perfis_publicacao?: number;
 };
 
 export type Precos = {

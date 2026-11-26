@@ -6,6 +6,7 @@ import { chamarClaude, custoEstimadoVideo, gerarImagem, iniciarVideo } from "./s
 import type { Aprovacao, MensagemClaude, Midia, TipoConteudo } from "./tipos";
 import { mensagemDePerfil, textoDoPerfil } from "./perfil";
 import { textoCusto } from "./custo";
+import { resumoPublicacaoParaGerente } from "./instagram";
 import { agoraISO, blobParaBase64, novoId, reduzirImagem } from "./util";
 
 type Store = ReturnType<typeof useStore>;
@@ -82,7 +83,16 @@ Pedidos com mais de 2 vídeos ou mais de 5 imagens: mostre antes o plano em list
 - Vídeos levam alguns minutos; inclua o id do vídeo nas mídias da aprovação e siga com o resto, sem esperar.
 
 ## Planejamento mensal
-Proponha o calendário em tabela (data, formato, tema, objetivo, IA que vai usar) e envie como item do tipo "planejamento" para aprovação. Só produza as peças depois do OK.
+Proponha o calendário em tabela (data, formato, tema, objetivo, IA que vai usar, publicação) e envie como item do tipo "planejamento" para aprovação. Só produza as peças depois do OK.
+
+## Publicação automática
+Cada plano publica sozinho uma quantidade de reels, stories e posts por mês em cada perfil (alguns planos sem limite); o resto o usuário posta manualmente. Consulte ver_publicacao_automatica antes de planejar um mês ou uma campanha.
+Antes de montar um planejamento ou campanha, pergunte (na mesma mensagem do briefing, se houver) como o usuário quer seguir, com a sua sugestão:
+1. Dentro do plano: só as peças que cabem na publicação automática do mês, todas programadas para sair sozinhas.
+2. Campanha completa: o ideal para o perfil, marcando quais peças você recomenda publicar automaticamente (as mais importantes, até o limite) e quais ficam para postar manualmente.
+3. Só os arquivos: tudo entregue para aprovação e download, sem publicação automática.
+Se a ferramenta disser que o perfil não publica sozinho, não pergunte: avise em uma linha e siga como na opção 3.
+Na tabela do planejamento, a coluna "Publicação" diz "Automática" ou "Manual". Nunca marque como automática mais peças do que o limite que resta no mês. Ao enviar cada peça para aprovação, informe publicar_automatico conforme o combinado.
 
 Formatos: feed 4:5 ou 1:1; stories e reels 9:16. No fim de cada entrega, resuma em poucas linhas o que foi feito e o que espera aprovação.
 O perfil da marca chega em mensagens de sistema ao longo da conversa; vale sempre o mais recente.`;
@@ -147,6 +157,10 @@ export const FERRAMENTAS: Anthropic.Beta.BetaTool[] = [
         data_publicacao: { type: "string", description: "Data e hora sugeridas no formato YYYY-MM-DDTHH:mm" },
         midias: { type: "array", items: { type: "string" }, description: "Ids das imagens/vídeos da peça, em ordem" },
         observacoes: { type: "string", description: "Notas para o usuário (ex.: música sugerida, como postar)" },
+        publicar_automatico: {
+          type: "boolean",
+          description: "true se esta peça deve sair sozinha na data (dentro do limite do plano); false se o usuário vai postar manualmente",
+        },
       },
       required: ["titulo", "tipo", "redes", "legenda"],
     },
@@ -176,6 +190,12 @@ export const FERRAMENTAS: Anthropic.Beta.BetaTool[] = [
   {
     name: "listar_agendamentos",
     description: "Mostra o que já está aprovado/programado/postado no calendário e o que está esperando aprovação.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "ver_publicacao_automatica",
+    description:
+      "Diz se este perfil publica sozinho, o limite mensal de reels, stories e posts automáticos do plano e quanto já está agendado neste mês e nos próximos dois.",
     input_schema: { type: "object", properties: {} },
   },
   {
@@ -278,6 +298,7 @@ async function executar(
           dataPublicacao: entrada.data_publicacao as string | undefined,
           midias: (entrada.midias as string[]) ?? [],
           observacoes: entrada.observacoes as string | undefined,
+          publicarAuto: typeof entrada.publicar_automatico === "boolean" ? entrada.publicar_automatico : undefined,
           status: "pendente",
           criadoEm: agoraISO(),
         };
@@ -341,6 +362,9 @@ async function executar(
         }
         return ok(conteudo);
       }
+
+      case "ver_publicacao_automatica":
+        return ok(await resumoPublicacaoParaGerente(store));
 
       case "listar_agendamentos": {
         const { agendamentos, aprovacoes } = store.obter();
@@ -444,6 +468,8 @@ function descreverEtapa(b: Anthropic.Beta.BetaToolUseBlock): string {
       return `${e.provedor === "seedance" ? "Seedance" : "Veo"} recebendo o vídeo: ${e.titulo ?? ""}...`;
     case "enviar_para_aprovacao":
       return `Enviando para aprovação: ${e.titulo ?? ""}...`;
+    case "ver_publicacao_automatica":
+      return "Conferindo a publicação automática do plano...";
     case "buscar_biblioteca":
       return `Procurando na biblioteca${e.consulta ? `: "${e.consulta}"` : ""}...`;
     case "ver_biblioteca":

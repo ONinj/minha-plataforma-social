@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { atualizarConexoes, useInstagram } from "@/lib/instagram";
+import { atualizarConexoes, useCota, useInstagram } from "@/lib/instagram";
 import { api } from "@/lib/nuvem";
 import { useStore } from "@/lib/store";
 import Icone from "./Icone";
@@ -146,6 +146,7 @@ export function CartaoMetricool() {
         <p className="ajuda" style={{ fontSize: 12 }}>
           No calendário, ative &quot;Publicar automaticamente&quot; em cada post. As redes marcadas no post saem juntas.
         </p>
+        <LinhaCota />
         {marca.link_conexao && (
           <a className="botao sec peq" href={marca.link_conexao} target="_blank" rel="noreferrer">
             <Icone nome="instagram" tamanho={15} /> Conectar / reconectar minhas redes
@@ -228,6 +229,24 @@ export function AdminMetricool({ conta }: { conta: string }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** "Este mês: 2/4 reels · 3/8 stories · 1/4 posts" — uso do limite de publicação automática do perfil. */
+export function LinhaCota() {
+  const store = useStore();
+  const cota = useCota(store);
+  if (!cota?.limites) return null;
+  const l = cota.limites;
+  return (
+    <div className="ajuda" style={{ fontSize: 12.5, marginTop: 8 }}>
+      <b>Publicação automática do seu plano</b> (renova todo mês):
+      {cota.meses.slice(0, 2).map((m) => (
+        <div key={m.mes}>
+          {m.nome}: {m.usados.reels}/{l.reels} reels · {m.usados.stories}/{l.stories} stories · {m.usados.posts}/{l.posts} posts
+        </div>
+      ))}
     </div>
   );
 }

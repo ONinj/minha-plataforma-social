@@ -2,6 +2,7 @@ import { conferirCaminho, linkDeLeitura } from "@/lib/servidor/arquivos";
 import { ErroHttp, contexto, exigirRecurso, responderErro, sql } from "@/lib/servidor/contexto";
 import { avancarPublicacao } from "@/lib/servidor/instagram";
 import * as metricool from "@/lib/servidor/metricool";
+import { conferirCota } from "@/lib/servidor/cota";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -83,6 +84,7 @@ export async function POST(req: Request) {
       if (isNaN(pedido)) throw new ErroHttp(400, "Data inválida.");
       if (pedido < Date.now() - 60_000) throw new ErroHttp(400, "Essa data já passou. Escolha um horário futuro ou use “Publicar agora”.");
       const quando = new Date(Math.max(pedido, minimo));
+      if (mc.cred.origem === "plataforma") await conferirCota(ctx, c.perfil, c.tipo, quando, c.id);
       // Links das mídias válidos até 3 dias depois da publicação (o Metricool baixa os arquivos).
       const validade = Math.ceil((quando.getTime() - Date.now()) / 1000) + 3 * 86400;
       const urls = await Promise.all(c.midias.map((m) => linkDeLeitura(m.caminho, validade)));
@@ -101,10 +103,10 @@ export async function POST(req: Request) {
       } catch (e) {
         throw new ErroHttp(400, e instanceof Error ? e.message : String(e));
       }
-      await db`insert into publicacoes (id, conta_id, perfil_id, quando, tipo, legenda, midias, status, via, externo_id)
-        values (${c.id}, ${ctx.conta.id}::uuid, ${c.perfil}, ${quando}, ${c.tipo}, ${c.legenda ?? ""}, ${db.json(c.midias as never)}, 'agendada', 'metricool', ${externo})
+      await db`insert into publicacoes (id, conta_id, perfil_id, quando, tipo, legenda, midias, status, via, externo_id, origem)
+        values (${c.id}, ${ctx.conta.id}::uuid, ${c.perfil}, ${quando}, ${c.tipo}, ${c.legenda ?? ""}, ${db.json(c.midias as never)}, 'agendada', 'metricool', ${externo}, ${mc.cred.origem})
         on conflict (id) do update set quando = excluded.quando, tipo = excluded.tipo, legenda = excluded.legenda, midias = excluded.midias,
-          status = 'agendada', via = 'metricool', externo_id = excluded.externo_id, tentativas = 0, containers = null, erro = null, atualizado_em = now()`;
+          status = 'agendada', via = 'metricool', externo_id = excluded.externo_id, origem = excluded.origem, tentativas = 0, containers = null, erro = null, atualizado_em = now()`;
       return Response.json({ status: "agendada", via: "metricool" });
     }
 
@@ -114,10 +116,11 @@ export async function POST(req: Request) {
     if (!con) throw new ErroHttp(400, "Este perfil ainda não está conectado para publicar (veja Perfis e redes).");
     const quando = c.agora ? new Date() : new Date(c.quando);
     if (isNaN(quando.getTime())) throw new ErroHttp(400, "Data inválida.");
+    await conferirCota(ctx, c.perfil, c.tipo, quando, c.id);
     await db`insert into publicacoes (id, conta_id, perfil_id, quando, tipo, legenda, midias, status, via)
       values (${c.id}, ${ctx.conta.id}::uuid, ${c.perfil}, ${quando}, ${c.tipo}, ${c.legenda ?? ""}, ${db.json(c.midias as never)}, 'agendada', 'instagram')
       on conflict (id) do update set quando = excluded.quando, tipo = excluded.tipo, legenda = excluded.legenda, midias = excluded.midias,
-        status = 'agendada', via = 'instagram', externo_id = null, tentativas = 0, containers = null, erro = null, atualizado_em = now()`;
+        status = 'agendada', via = 'instagram', externo_id = null, origem = 'plataforma', tentativas = 0, containers = null, erro = null, atualizado_em = now()`;
 
     if (c.agora) {
       // Publica na hora (vídeos podem precisar de alguns minutos para o Instagram processar).

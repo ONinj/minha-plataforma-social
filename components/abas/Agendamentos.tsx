@@ -387,7 +387,7 @@ function PainelInstagram({ item, aoFechar }: { item: Agendamento; aoFechar: () =
         <p className="ajuda" style={{ marginBottom: 0 }}>
           {ig.noPlano || ig.metricool?.propria
             ? "Este perfil ainda não está pronto para publicar sozinho (veja Perfis e redes)."
-            : "🔒 Publicação automática a partir do plano Premium (ou com o seu próprio Metricool, em Configurações)."}
+            : "🔒 Publicação automática a partir do plano Essencial (ou com o seu próprio Metricool, em Configurações)."}
         </p>
       ) : (
         <>
