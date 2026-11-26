@@ -1,4 +1,4 @@
-import { PACOTES, asaas } from "@/lib/servidor/asaas";
+import { PACOTES, asaas, registrarAviso } from "@/lib/servidor/asaas";
 import { sql } from "@/lib/servidor/contexto";
 
 export const runtime = "nodejs";
@@ -24,11 +24,16 @@ async function registrarPagamento(conta: string, tipo: "assinatura" | "recarga",
  * mandar o mesmo aviso mais de uma vez).
  */
 export async function POST(req: Request) {
-  const token = process.env.ASAAS_WEBHOOK_TOKEN;
-  if (!token || req.headers.get("asaas-access-token") !== token) {
+  const token = process.env.ASAAS_WEBHOOK_TOKEN?.trim();
+  const recebido = req.headers.get("asaas-access-token")?.trim();
+  if (!token || recebido !== token) {
+    await registrarAviso({
+      resultado: !token ? "recusado: falta ASAAS_WEBHOOK_TOKEN na Vercel" : !recebido ? "recusado: o Asaas não mandou token (preencha o token no webhook)" : "recusado: o token do webhook no Asaas é diferente do ASAAS_WEBHOOK_TOKEN da Vercel",
+    });
     return Response.json({ error: "não autorizado" }, { status: 401 });
   }
   const ev = (await req.json()) as Evento;
+  await registrarAviso({ resultado: "recebido", evento: ev.event });
   const db = sql();
   const p = ev.payment;
 

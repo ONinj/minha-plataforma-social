@@ -1,5 +1,6 @@
 import { urlSupabase } from "@/lib/supabaseUrl";
 import { MODO_NUVEM, sql } from "@/lib/servidor/contexto";
+import { asaas, asaasEmProducao } from "@/lib/servidor/asaas";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,6 +60,28 @@ export async function GET() {
     r.supabase_login = resp.ok ? "ok" : `ERRO ${resp.status}: confira a NEXT_PUBLIC_SUPABASE_ANON_KEY`;
   } catch (e) {
     r.supabase_login = `ERRO: ${e instanceof Error ? e.message : String(e)}`;
+  }
+  // Cobrança: qual ambiente está em uso, se a chave combina com ele e se os avisos (webhook) estão chegando.
+  if (process.env.ASAAS_API_KEY) {
+    const prod = asaasEmProducao();
+    r.asaas_ambiente_em_uso = prod ? "producao (cobrança real)" : `TESTE/sandbox (ASAAS_AMBIENTE está "${(process.env.ASAAS_AMBIENTE ?? "").trim() || "vazio"}"; para cobrar de verdade escreva producao)`;
+    const chave = process.env.ASAAS_API_KEY.trim();
+    const pareceTeste = chave.includes("_hmlg_"), pareceProd = chave.includes("_prod_");
+    try {
+      await asaas("/finance/balance");
+      r.asaas_chave = "ok (funciona neste ambiente)";
+    } catch (e) {
+      r.asaas_chave = `ERRO: ${e instanceof Error ? e.message : String(e)}`;
+      if (prod && pareceTeste) r.asaas_chave += " · a chave parece ser do sandbox, mas o ambiente é produção";
+      if (!prod && pareceProd) r.asaas_chave += " · a chave parece ser de produção, mas o ambiente é teste";
+    }
+    try {
+      const [c] = await sql()`select ultimo_webhook from config_global where id = 1`;
+      const u = c?.ultimo_webhook as { resultado?: string; evento?: string; em?: string } | null;
+      r.asaas_ultimo_aviso = u ? `${u.resultado}${u.evento ? ` (${u.evento})` : ""} em ${new Date(u.em ?? "").toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}` : "nenhum aviso do Asaas chegou ainda (confira o webhook no painel do Asaas)";
+    } catch {
+      r.asaas_ultimo_aviso = "rode supabase/migrations/005_diagnostico_asaas.sql para ver isto";
+    }
   }
   return Response.json(r, { headers: { "Cache-Control": "no-store" } });
 }

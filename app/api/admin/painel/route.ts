@@ -1,4 +1,5 @@
 import { ErroHttp, contexto, responderErro, sql } from "@/lib/servidor/contexto";
+import { asaasEmProducao } from "@/lib/servidor/asaas";
 import { plataformaConfigurada } from "@/lib/servidor/metricool";
 import { dolarHoje } from "@/lib/servidor/painel";
 
@@ -112,13 +113,13 @@ export async function GET(req: Request) {
     if (contas.negativas) alertas.push({ nivel: "aviso", texto: `${contas.negativas} conta(s) com saldo negativo.` });
     for (const g of gastoAlto) alertas.push({ nivel: "aviso", texto: `"${g.nome}" gastou ${brl(Number(g.custo))} em IA nas últimas 24 h.` });
     if (contas.novas_24h > 20) alertas.push({ nivel: "aviso", texto: `${contas.novas_24h} contas novas em 24 h. Se não for campanha sua, pode ser abuso do teste grátis.` });
-    if (process.env.ASAAS_API_KEY && process.env.ASAAS_AMBIENTE !== "producao") alertas.push({ nivel: "aviso", texto: "A cobrança está em modo de teste (sandbox). Para receber de verdade, coloque ASAAS_AMBIENTE = producao na Vercel." });
+    if (process.env.ASAAS_API_KEY && !asaasEmProducao()) alertas.push({ nivel: "aviso", texto: "A cobrança está em modo de teste (sandbox). Para receber de verdade, coloque ASAAS_AMBIENTE = producao na Vercel." });
     if (!process.env.ASAAS_API_KEY) alertas.push({ nivel: "aviso", texto: "A cobrança (Asaas) ainda não está configurada." });
 
     const integracoes = [
       { nome: "Claude (Anthropic)", ok: !!process.env.ANTHROPIC_API_KEY },
       { nome: "Imagens e vídeos (fal.ai)", ok: !!process.env.FAL_KEY },
-      { nome: "Cobrança (Asaas)", ok: !!process.env.ASAAS_API_KEY, detalhe: process.env.ASAAS_AMBIENTE === "producao" ? "produção" : "teste" },
+      { nome: "Cobrança (Asaas)", ok: !!process.env.ASAAS_API_KEY, detalhe: asaasEmProducao() ? "produção" : "teste" },
       { nome: "Aviso de pagamento (webhook)", ok: !!process.env.ASAAS_WEBHOOK_TOKEN },
       { nome: "Metricool", ok: plataformaConfigurada() },
       { nome: "Instagram direto (Meta)", ok: !!(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET) },

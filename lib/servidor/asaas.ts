@@ -12,9 +12,21 @@ export function valorRecarga(valor: number, desconto = 0) {
   return Math.round(valor * (1 - Math.min(Math.max(desconto, 0), 0.5)) * 100) / 100;
 }
 
+/** Asaas em produção? Aceita "producao", "produção", "Produção", "production" ou "prod". */
+export function asaasEmProducao() {
+  const v = (process.env.ASAAS_AMBIENTE ?? "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return ["producao", "production", "prod"].includes(v);
+}
+
 function base() {
   if (process.env.ASAAS_BASE_URL) return process.env.ASAAS_BASE_URL;
-  return process.env.ASAAS_AMBIENTE === "producao" ? "https://api.asaas.com/v3" : "https://api-sandbox.asaas.com/v3";
+  return asaasEmProducao() ? "https://api.asaas.com/v3" : "https://api-sandbox.asaas.com/v3";
+}
+
+/** Guarda o último aviso recebido do Asaas, para o diagnóstico (não guarda dados do cliente). */
+export async function registrarAviso(dados: Record<string, unknown>) {
+  const { sql } = await import("./contexto");
+  await sql()`update config_global set ultimo_webhook = ${sql().json({ ...dados, em: new Date().toISOString() } as never)} where id = 1`.catch(() => {});
 }
 
 export async function asaas<T = Record<string, unknown>>(caminho: string, metodo = "GET", corpo?: unknown): Promise<T> {
