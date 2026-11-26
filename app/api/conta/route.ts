@@ -1,5 +1,6 @@
 import { MODO_NUVEM, contexto, responderErro, sql } from "@/lib/servidor/contexto";
 import { plataformaConfigurada } from "@/lib/servidor/metricool";
+import { alertaDeGasto } from "@/lib/servidor/painel";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,7 @@ export async function GET(req: Request) {
       where m.user_id = ${ctx.userId}::uuid order by m.criado_em`;
     const planos = await db`select id, nome, preco, creditos_mensais, recursos from planos where publico order by ordem`;
     const [pendente] = await db`select plano_pendente from contas where id = ${ctx.conta.id}::uuid`;
+    const alertaAdmin = ctx.admin ? await alertaDeGasto().catch(() => null) : null;
     return Response.json({
       modo: "nuvem",
       usuario: { id: ctx.userId, email: ctx.email, admin: ctx.admin },
@@ -28,6 +30,7 @@ export async function GET(req: Request) {
       instagramConfigurado: !!(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET && process.env.CHAVE_CRIPTO),
       metricoolConfigurado: plataformaConfigurada(),
       criptoConfigurada: !!process.env.CHAVE_CRIPTO,
+      alertaAdmin,
     });
   } catch (e) {
     return responderErro(e);

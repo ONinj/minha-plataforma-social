@@ -31,6 +31,10 @@ export type InfoNuvem = {
     drive: boolean;
     esforco_max: string;
     instagram?: boolean;
+    seedance_resolucoes?: string[];
+    acumulo?: number;
+    desconto_recarga?: number;
+    extras?: string[];
   };
   cambio: number;
   precos: {
@@ -39,6 +43,7 @@ export type InfoNuvem = {
     segundos_veo: number;
     seedance_por_segundo: Record<string, number>;
     segundos_seedance: number;
+    margem_seguranca?: number;
   };
   contas: { id: string; nome: string; plano_id: string; papel: string }[];
   planos: { id: string; nome: string; preco: number; creditos_mensais: number; recursos: InfoNuvem["recursos"] }[];
@@ -47,6 +52,7 @@ export type InfoNuvem = {
   instagramConfigurado: boolean;
   metricoolConfigurado?: boolean;
   criptoConfigurada?: boolean;
+  alertaAdmin?: string | null;
 };
 
 const PREFS: (keyof Configuracoes)[] = [
@@ -78,6 +84,8 @@ export function configDoPlano(info: InfoNuvem): Configuracoes {
   c.precoImagem = info.precos.imagem[c.modeloImagemFal] ?? c.precoImagem;
   c.precoVeoSegundo = info.precos.veo_por_segundo[c.modeloVeoFal] ?? c.precoVeoSegundo;
   c.segundosVeo = info.precos.segundos_veo;
+  if (r.seedance_resolucoes?.length && !r.seedance_resolucoes.includes(c.resolucaoSeedance))
+    c.resolucaoSeedance = r.seedance_resolucoes.includes("720p") ? "720p" : r.seedance_resolucoes[0];
   c.precoSeedanceSegundo = info.precos.seedance_por_segundo[c.resolucaoSeedance] ?? c.precoSeedanceSegundo;
   c.segundosSeedance = info.precos.segundos_seedance;
   return c;

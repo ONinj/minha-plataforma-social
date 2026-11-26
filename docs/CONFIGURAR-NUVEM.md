@@ -18,6 +18,7 @@ Faça na ordem. Leva uns 40 minutos.
 
 1. Crie uma conta em **supabase.com** e um projeto novo (região: São Paulo). Guarde a senha do banco.
 2. Menu **SQL Editor → New query**: cole todo o conteúdo de `supabase/migrations/001_planos_creditos.sql` e clique em **Run**.
+   Depois rode, um de cada vez e nesta ordem, os outros arquivos da pasta `supabase/migrations` (002, 003, 004...). Todos podem ser rodados de novo sem problema.
    (Pode rodar de novo no futuro sem problema; ele não apaga nada.)
 3. Menu **Authentication → URL Configuration**:
    - **Site URL**: o endereço do seu site na Vercel (ex.: `https://minha-plataforma-social.vercel.app`).

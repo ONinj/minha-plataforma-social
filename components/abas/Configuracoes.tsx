@@ -8,6 +8,8 @@ import { MODO_NUVEM } from "@/lib/nuvem";
 import Icone from "../Icone";
 import { MetricoolProprio } from "../Metricool";
 
+const ORDEM_ESFORCO = ["low", "medium", "high", "xhigh", "max"];
+
 export default function Configuracoes() {
   const store = useStore();
   const { conta, raiz } = store;
@@ -107,9 +109,19 @@ export default function Configuracoes() {
             <select value={c.esforcoGerente} onChange={(e) => mudar("esforcoGerente", e.target.value as Config["esforcoGerente"])}>
               <option value="low">Baixo (mais rápido e barato)</option>
               <option value="medium">Médio (recomendado)</option>
-              <option value="high" disabled={!!r && r.esforco_max !== "high"}>
-                {!r || r.esforco_max === "high" ? "Alto (planejamentos mais caprichados)" : "🔒 Alto (plano Premium)"}
-              </option>
+              {(
+                [
+                  ["high", "Alto (planejamentos mais caprichados)", "Profissional"],
+                  ["max", "Máximo (o mais completo, mais lento)", "Premium"],
+                ] as const
+              ).map(([v, nome, plano]) => {
+                const ok = !r || ORDEM_ESFORCO.indexOf(v) <= ORDEM_ESFORCO.indexOf(r.esforco_max);
+                return (
+                  <option key={v} value={v} disabled={!ok}>
+                    {ok ? nome : `🔒 ${nome.split(" (")[0]} (plano ${plano})`}
+                  </option>
+                );
+              })}
             </select>
           </div>
           <div className="campo">
@@ -135,9 +147,20 @@ export default function Configuracoes() {
           <div className="campo">
             <label>Resolução do Seedance</label>
             <select value={c.resolucaoSeedance} onChange={(e) => mudar("resolucaoSeedance", e.target.value)}>
-              <option value="480p">480p (mais barato)</option>
-              <option value="720p">720p</option>
-              <option value="1080p">1080p (mais caro)</option>
+              {(
+                [
+                  ["480p", "480p (mais barato)"],
+                  ["720p", "720p"],
+                  ["1080p", "1080p (mais caro)"],
+                ] as const
+              ).map(([v, nome]) => {
+                const ok = !r?.seedance_resolucoes || r.seedance_resolucoes.includes(v);
+                return (
+                  <option key={v} value={v} disabled={!ok}>
+                    {ok ? nome : `🔒 ${v} (outro plano)`}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>

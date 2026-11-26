@@ -1,4 +1,4 @@
-import { PACOTES, asaas, hoje } from "@/lib/servidor/asaas";
+import { PACOTES, asaas, hoje, valorRecarga } from "@/lib/servidor/asaas";
 import { ErroHttp, contexto, responderErro, sql } from "@/lib/servidor/contexto";
 
 export const runtime = "nodejs";
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       const pag = await asaas<{ invoiceUrl: string }>("/payments", "POST", {
         customer: cliente,
         billingType: "UNDEFINED",
-        value: pacote.valor,
+        value: valorRecarga(pacote.valor, ctx.recursos.desconto_recarga),
         dueDate: hoje(),
         description: `Central Social · Recarga de ${pacote.nome}`,
         externalReference: `recarga:${ctx.conta.id}:${c.pacote}`,

@@ -7,6 +7,11 @@ export const PACOTES: Record<string, { creditos: number; valor: number; nome: st
   p1500: { creditos: 1500, valor: 199.9, nome: "1.500 créditos" },
 };
 
+/** Valor da recarga com o desconto do plano. */
+export function valorRecarga(valor: number, desconto = 0) {
+  return Math.round(valor * (1 - Math.min(Math.max(desconto, 0), 0.5)) * 100) / 100;
+}
+
 function base() {
   if (process.env.ASAAS_BASE_URL) return process.env.ASAAS_BASE_URL;
   return process.env.ASAAS_AMBIENTE === "producao" ? "https://api.asaas.com/v3" : "https://api-sandbox.asaas.com/v3";

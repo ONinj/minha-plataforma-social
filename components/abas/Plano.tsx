@@ -8,11 +8,42 @@ import { brl, formatarData } from "@/lib/util";
 import Icone from "../Icone";
 import ModalFormulario from "../ModalFormulario";
 
-const PRODUCAO: Record<string, string> = {
-  essencial: "≈ 4 reels · 8 posts · 8 stories por mês",
-  profissional: "≈ 6 reels · 12 posts · 12 stories · 2 carrosséis",
-  premium: "≈ 12 reels · 20 posts · 20 stories · 3 carrosséis",
-};
+type InfoPlano = ReturnType<typeof useStore>["nuvem"] & {};
+type RecursosPlano = InfoPlano["recursos"];
+
+const ESFORCO: Record<string, string> = { low: "Baixo", medium: "Médio", high: "Alto", xhigh: "Muito alto", max: "Máximo" };
+
+/** Quanto dá para produzir com os créditos (pelos preços atuais das IAs). */
+function estimativa(n: InfoPlano, creditos: number) {
+  const margem = Number((n.precos as { margem_seguranca?: number }).margem_seguranca ?? 1);
+  const emCreditos = (usd: number) => (usd * n.cambio * margem) / 0.1;
+  const imagem = emCreditos(n.precos.imagem["fal-ai/nano-banana-2"] ?? 0.08);
+  const video = emCreditos((n.precos.veo_por_segundo["fal-ai/veo3.1/lite"] ?? 0.06) * n.precos.segundos_veo);
+  return `≈ ${Math.floor(creditos / imagem)} imagens ou ${Math.floor(creditos / video)} vídeos de ${n.precos.segundos_veo}s por mês`;
+}
+
+/** Lista de benefícios gerada a partir do que o plano libera de verdade. */
+function beneficios(r: RecursosPlano): { texto: string; tem: boolean }[] {
+  const res = r.seedance_resolucoes;
+  const pct = (v?: number) => `${Math.round((v ?? 0) * 100)}%`;
+  return [
+    { texto: `${r.max_perfis} perfi${r.max_perfis > 1 ? "s" : "l"} de clientes`, tem: true },
+    { texto: r.claude.includes("claude-opus-5-5") ? "Gerente com Claude Opus e Sonnet" : "Gerente com Claude Sonnet", tem: true },
+    { texto: `Capricho do gerente: até ${ESFORCO[r.esforco_max] ?? r.esforco_max}`, tem: true },
+    { texto: r.imagem.includes("fal-ai/nano-banana-pro") ? "Imagens Nano Banana 2 e Pro" : "Imagens Nano Banana 2", tem: true },
+    {
+      texto: r.veo.includes("fal-ai/veo3.1") ? "Veo 3.1 Lite, Fast e completo" : r.veo.includes("fal-ai/veo3.1/fast") ? "Veo 3.1 Lite e Fast" : "Veo 3.1 Lite",
+      tem: true,
+    },
+    { texto: r.seedance ? `Seedance até ${res?.length ? res[res.length - 1] : "1080p"}` : "Seedance", tem: !!r.seedance },
+    { texto: "Biblioteca de referências", tem: !!r.biblioteca },
+    { texto: "Importar do Google Drive", tem: !!r.drive },
+    { texto: "Publicação automática no Instagram", tem: !!r.instagram },
+    { texto: r.acumulo ? `Sobra de créditos acumula até ${pct(r.acumulo)} do plano` : "Créditos acumulam para o mês seguinte", tem: !!r.acumulo },
+    { texto: r.desconto_recarga ? `${pct(r.desconto_recarga)} de desconto nas recargas` : "Desconto nas recargas", tem: !!r.desconto_recarga },
+    ...(r.extras ?? []).map((t) => ({ texto: t, tem: true })),
+  ];
+}
 
 const PACOTES = [
   { id: "p100", creditos: 100, valor: 14.9 },
@@ -129,7 +160,8 @@ export default function Plano() {
             <Icone nome="raio" /> Recarga avulsa
           </h3>
           <p className="ajuda" style={{ marginTop: -4 }}>
-            Créditos extras para o mês em que você precisar de mais.
+            Créditos extras que não vencem.
+            {n.recursos.desconto_recarga ? ` Seu plano tem ${Math.round(n.recursos.desconto_recarga * 100)}% de desconto.` : ""}
           </p>
           <div className="lista" style={{ gap: 8 }}>
             {PACOTES.map((p) => (
@@ -142,7 +174,12 @@ export default function Plano() {
                 onClick={() => escolher("recarga", p.id)}
               >
                 <span>{formatarCreditos(p.creditos)} créditos</span>
-                <b>{brl(p.valor)}</b>
+                <span>
+                  {!!n.recursos.desconto_recarga && (
+                    <s style={{ color: "var(--texto-3)", fontSize: 12, marginRight: 6 }}>{brl(p.valor)}</s>
+                  )}
+                  <b>{brl(Math.round(p.valor * (1 - (n.recursos.desconto_recarga ?? 0)) * 100) / 100)}</b>
+                </span>
               </button>
             ))}
           </div>
@@ -162,17 +199,13 @@ export default function Plano() {
                 <small>/mês</small>
               </div>
               <span className="etiqueta">{formatarCreditos(p.creditos_mensais)} créditos por mês</span>
-              <span className="ajuda">{PRODUCAO[p.id]}</span>
+              <span className="ajuda">{estimativa(n, p.creditos_mensais)}</span>
               <ul>
-                <li>
-                  {r.max_perfis} perfil{r.max_perfis > 1 ? "s" : ""}
-                </li>
-                <li>{r.claude.includes("claude-opus-5-5") ? "Claude Opus e Sonnet" : "Claude Sonnet"}</li>
-                <li>{r.imagem.includes("fal-ai/nano-banana-pro") ? "Nano Banana 2 e Pro" : "Nano Banana 2"}</li>
-                <li>{r.veo.includes("fal-ai/veo3.1") ? "Veo 3.1 Lite, Fast e completo" : r.veo.includes("fal-ai/veo3.1/fast") ? "Veo 3.1 Lite e Fast" : "Veo 3.1 Lite"}</li>
-                <li className={r.seedance ? "" : "nao"}>Seedance</li>
-                <li className={r.biblioteca ? "" : "nao"}>Biblioteca de referências</li>
-                <li className={r.drive ? "" : "nao"}>Importar do Google Drive</li>
+                {beneficios(r).map((b) => (
+                  <li key={b.texto} className={b.tem ? "" : "nao"}>
+                    {b.texto}
+                  </li>
+                ))}
               </ul>
               <div style={{ marginTop: "auto" }}>
                 {atual && n.conta.status !== "cancelado" ? (
@@ -193,10 +226,12 @@ export default function Plano() {
           <div className="preco" style={{ fontSize: 22 }}>Sob consulta</div>
           <span className="ajuda">Créditos, perfis e equipe sob medida para empresas e agências.</span>
           <ul>
-            <li>Vários perfis e usuários</li>
-            <li>Todas as IAs</li>
-            <li>Créditos combinados</li>
-            <li>Atendimento direto</li>
+            <li>Dezenas de perfis de clientes</li>
+            <li>Todas as IAs no máximo</li>
+            <li>Créditos e valor combinados</li>
+            <li>Publicação automática no Instagram</li>
+            <li>Maior desconto nas recargas</li>
+            <li>Atendimento dedicado</li>
           </ul>
           <div style={{ marginTop: "auto" }}>
             {zap ? (

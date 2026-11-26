@@ -69,8 +69,16 @@ export type Recursos = {
   seedance: boolean;
   biblioteca: boolean;
   drive: boolean;
-  esforco_max: "low" | "medium" | "high";
+  esforco_max: "low" | "medium" | "high" | "xhigh" | "max";
   instagram?: boolean;
+  /** Resoluções do Seedance liberadas (sem a lista = todas). */
+  seedance_resolucoes?: string[];
+  /** Parte dos créditos do plano que acumula para o mês seguinte (0 a 1). */
+  acumulo?: number;
+  /** Desconto nas recargas avulsas (0 a 1). */
+  desconto_recarga?: number;
+  /** Benefícios extras mostrados na lista do plano. */
+  extras?: string[];
 };
 
 export type Precos = {

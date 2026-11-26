@@ -7,6 +7,7 @@ import { useStore } from "@/lib/store";
 import { brl, formatarData } from "@/lib/util";
 import Icone from "../Icone";
 import { AdminMetricool } from "../Metricool";
+import { PlanosAdmin, VisaoGeral, usePainel } from "./AdminPainel";
 
 type ContaAdmin = {
   id: string;
@@ -30,6 +31,8 @@ export default function Admin() {
   const [dados, setDados] = useState<{ contas: ContaAdmin[]; planos: { id: string; nome: string }[] } | null>(null);
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<ContaAdmin | null>(null);
+  const [secao, setSecao] = useState<"geral" | "contas" | "planos">("geral");
+  const painel = usePainel();
 
   const carregar = useCallback(() => {
     api<{ contas: ContaAdmin[]; planos: { id: string; nome: string }[] }>("/api/admin")
@@ -46,8 +49,40 @@ export default function Admin() {
   const t = busca.toLowerCase();
   const lista = dados.contas.filter((c) => !t || `${c.nome} ${c.emails}`.toLowerCase().includes(t));
 
+  const abas = (
+    <div className="filtros" style={{ marginBottom: 16 }}>
+      {(
+        [
+          ["geral", "Visão geral"],
+          ["contas", `Contas (${dados.contas.length})`],
+          ["planos", "Planos e preços"],
+        ] as const
+      ).map(([id, nome]) => (
+        <button key={id} className={`filtro ${secao === id ? "ativo" : ""}`} onClick={() => setSecao(id)}>
+          {nome}
+        </button>
+      ))}
+      <button className="filtro" onClick={() => { carregar(); painel.carregar(); }}>↻ Atualizar</button>
+    </div>
+  );
+  if (secao !== "contas") {
+    return (
+      <div className="conteudo">
+        {abas}
+        {!painel.dados ? (
+          <div className="girando" />
+        ) : secao === "geral" ? (
+          <VisaoGeral dados={painel.dados} recarregar={painel.carregar} />
+        ) : (
+          <PlanosAdmin key={JSON.stringify(painel.dados.planos)} dados={painel.dados} recarregar={painel.carregar} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="conteudo">
+      {abas}
       <div className="estatisticas" style={{ marginTop: 0 }}>
         <div className="estat"><strong>{dados.contas.length}</strong><span>Contas</span></div>
         <div className="estat"><strong>{ativos.length}</strong><span>Assinaturas ativas</span></div>

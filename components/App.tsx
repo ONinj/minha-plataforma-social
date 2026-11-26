@@ -122,6 +122,13 @@ function Plataforma() {
     return () => window.removeEventListener("beforeunload", aviso);
   }, [store.ocupado]);
 
+  // Alerta de gasto com IA para o administrador (uma vez por visita).
+  const alertaAdmin = store.nuvem?.alertaAdmin;
+  useEffect(() => {
+    if (alertaAdmin) store.avisar(alertaAdmin, "erro");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alertaAdmin]);
+
   // Volta do login do Instagram (?instagram=ok|erro).
   useEffect(() => {
     if (!store.nuvem) return;

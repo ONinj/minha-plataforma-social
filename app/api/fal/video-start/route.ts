@@ -50,7 +50,11 @@ export async function POST(req: Request) {
     if (MODO_NUVEM) {
       ctx = await contexto(req);
       if (c.familia === "veo") exigirRecurso(ctx.recursos.veo.includes(c.modelo), "Este modelo do Veo não está no seu plano.");
-      else exigirRecurso(ctx.recursos.seedance, "O Seedance não está no seu plano.");
+      else {
+        exigirRecurso(ctx.recursos.seedance, "O Seedance não está no seu plano.");
+        const res = ctx.recursos.seedance_resolucoes;
+        exigirRecurso(!res || res.includes(c.resolucao ?? "720p"), `O Seedance em ${c.resolucao ?? "720p"} não está no seu plano. Escolha outra resolução em Configurações.`);
+      }
       if (c.videoReferenciaCaminho) {
         exigirRecurso(ctx.recursos.biblioteca, "Vídeo de referência da biblioteca não está no seu plano.");
         conferirCaminho(ctx, c.videoReferenciaCaminho);
