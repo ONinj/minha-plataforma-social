@@ -229,21 +229,201 @@ function esperar(v: HTMLVideoElement, evento: string) {
   return new Promise<void>((ok) => v.addEventListener(evento, () => ok(), { once: true }));
 }
 
+type Opcoes = { logo?: Blob | null; aoProgresso?: (p: number) => void };
+type Bloco = { inicio: number; fim: number; palavras: Palavra[] };
+
+/** Desenha legendas, textos e logo por cima do quadro já desenhado no canvas. */
+function desenharSobreposicoes(
+  g: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  W: number,
+  H: number,
+  plano: PlanoEdicao,
+  blocos: Bloco[],
+  logo: ImageBitmap | null,
+  tFonte: number,
+  tFinal: number,
+) {
+  const L = plano.legendas;
+  const fonte = Math.round(W * ({ p: 0.045, m: 0.058, g: 0.072 }[L.tamanho] ?? 0.058));
+  if (L.ativo) {
+    const b = blocos.find((x) => tFonte >= x.inicio - 0.05 && tFonte <= x.fim + 0.15);
+    if (b) {
+      g.font = `800 ${fonte}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
+      g.textAlign = "left";
+      g.textBaseline = "middle";
+      const palavrasB = b.palavras.map((p) => ({ ...p, texto: L.maiusculas ? p.texto.toUpperCase() : p.texto }));
+      const espaco = g.measureText(" ").width;
+      const linhas: (typeof palavrasB)[] = [[]];
+      let largura = 0;
+      for (const p of palavrasB) {
+        const w = g.measureText(p.texto).width;
+        if (largura + w > W * 0.84 && linhas[linhas.length - 1].length) {
+          linhas.push([]);
+          largura = 0;
+        }
+        linhas[linhas.length - 1].push(p);
+        largura += w + espaco;
+      }
+      const yBase = L.posicao === "topo" ? H * 0.16 : L.posicao === "meio" ? H * 0.5 : H * 0.78;
+      linhas.forEach((linha, i) => {
+        const wLinha = linha.reduce((s, p) => s + g.measureText(p.texto).width, 0) + espaco * (linha.length - 1);
+        let x = (W - wLinha) / 2;
+        const y = yBase + (i - (linhas.length - 1) / 2) * fonte * 1.25;
+        for (const p of linha) {
+          g.lineWidth = fonte * 0.16;
+          g.strokeStyle = "rgba(0,0,0,.85)";
+          g.lineJoin = "round";
+          g.strokeText(p.texto, x, y);
+          g.fillStyle = tFonte >= p.inicio && tFonte <= p.fim + 0.05 ? L.destaque : L.cor;
+          g.fillText(p.texto, x, y);
+          x += g.measureText(p.texto).width + espaco;
+        }
+      });
+    }
+  }
+  for (const t of plano.textos) {
+    if (tFinal < t.inicio || tFinal > t.fim) continue;
+    const tam = Math.round(W * 0.055);
+    g.font = `800 ${tam}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    const w = Math.min(W * 0.9, g.measureText(t.texto).width + tam * 1.2);
+    const y = t.posicao === "topo" ? H * 0.09 : t.posicao === "meio" ? H * 0.42 : H * 0.9;
+    g.fillStyle = "rgba(0,0,0,.6)";
+    g.beginPath();
+    g.roundRect((W - w) / 2, y - tam * 0.85, w, tam * 1.7, tam * 0.5);
+    g.fill();
+    g.fillStyle = L.cor;
+    g.fillText(t.texto, W / 2, y, W * 0.86);
+  }
+  if (logo) {
+    const lw = W * 0.14, lh = (logo.height / logo.width) * lw, m = W * 0.04;
+    const x = plano.logo.posicao.endsWith("direita") ? W - lw - m : m;
+    const y = plano.logo.posicao.startsWith("topo") ? m : H - lh - m;
+    g.globalAlpha = 0.92;
+    g.drawImage(logo, x, y, lw, lh);
+    g.globalAlpha = 1;
+  }
+}
+
+class SemSuporte extends Error {}
+
 /**
- * Monta o vídeo final tocando os trechos escolhidos e desenhando cada quadro (com legendas, textos e logo)
- * num canvas que é gravado junto com o áudio. Leva o mesmo tempo do vídeo final.
+ * Monta o vídeo final quadro a quadro com WebCodecs (biblioteca Mediabunny): lê cada quadro exato dos trechos,
+ * desenha legendas/textos/logo e codifica em MP4. Não depende de tocar o vídeo, então não perde quadros nem trava,
+ * e não precisa da aba visível.
  */
-export async function montarVideo(
+async function montarQuadroAQuadro(blob: Blob, plano: PlanoEdicao, palavras: Palavra[], opcoes: Opcoes) {
+  if (typeof VideoEncoder === "undefined" || typeof VideoDecoder === "undefined") throw new SemSuporte("sem WebCodecs");
+  const mb = await import("mediabunny");
+  const input = new mb.Input({ source: new mb.BlobSource(blob), formats: mb.ALL_FORMATS });
+  const vtrack = await input.getPrimaryVideoTrack();
+  if (!vtrack || !(await vtrack.canDecode())) throw new SemSuporte("não decodifica o vídeo");
+  const atrack = await input.getPrimaryAudioTrack();
+  const temAudio = !!atrack && (await atrack.canDecode());
+
+  let [W, H] = TAMANHOS[plano.formato] ?? [vtrack.displayWidth, vtrack.displayHeight];
+  if (!TAMANHOS[plano.formato]) {
+    const escala = Math.min(1, 1920 / Math.max(W, H));
+    W = Math.round((W * escala) / 2) * 2;
+    H = Math.round((H * escala) / 2) * 2;
+  }
+  if (!(await mb.canEncodeVideo("avc", { width: W, height: H }))) throw new SemSuporte("não codifica H.264");
+  const codecAudio = temAudio ? ((await mb.canEncodeAudio("aac")) ? "aac" : (await mb.canEncodeAudio("opus")) ? "opus" : null) : null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const g = canvas.getContext("2d")!;
+  const logo = opcoes.logo && plano.logo.ativo ? await createImageBitmap(opcoes.logo) : null;
+  const blocos = blocosDeLegenda(palavras);
+  const fps = 30;
+  const total = duracaoFinal(plano);
+
+  const output = new mb.Output({ format: new mb.Mp4OutputFormat(), target: new mb.BufferTarget() });
+  const video = new mb.CanvasSource(canvas, { codec: "avc", bitrate: mb.QUALITY_HIGH, keyFrameInterval: 2 });
+  output.addVideoTrack(video, { frameRate: fps });
+  const audio = codecAudio ? new mb.AudioBufferSource({ codec: codecAudio, bitrate: mb.QUALITY_HIGH }) : null;
+  if (audio) output.addAudioTrack(audio);
+  await output.start();
+
+  // "cover": preenche o formato cortando as sobras; a rotação do celular já vem aplicada.
+  const quadros = new mb.CanvasSink(vtrack, { width: W, height: H, fit: "cover" });
+  const sons = temAudio && audio ? new mb.AudioBufferSink(atrack!) : null;
+  let tSaida = 0;
+  try {
+    for (const c of plano.cortes) {
+      const n = Math.max(1, Math.round((c.fim - c.inicio) * fps));
+      const tempos = Array.from({ length: n }, (_, i) => c.inicio + i / fps);
+      let i = 0;
+      for await (const q of quadros.canvasesAtTimestamps(tempos)) {
+        if (q) {
+          g.drawImage(q.canvas, 0, 0, W, H);
+        } else if (i === 0) {
+          g.fillStyle = "#000";
+          g.fillRect(0, 0, W, H);
+        }
+        desenharSobreposicoes(g, W, H, plano, blocos, logo, tempos[i], tSaida + i / fps);
+        await video.add(tSaida + i / fps, 1 / fps);
+        i++;
+        if (i % 10 === 0) opcoes.aoProgresso?.(Math.min(0.99, (tSaida + i / fps) / Math.max(0.1, total)));
+      }
+      // Áudio do mesmo trecho (cortado na medida exata).
+      if (sons && audio) {
+        const fimTrecho = c.inicio + n / fps;
+        for await (const s of sons.buffers(c.inicio, fimTrecho)) {
+          const ini = Math.max(c.inicio, s.timestamp), fim = Math.min(fimTrecho, s.timestamp + s.duration);
+          if (fim <= ini) continue;
+          const taxa = s.buffer.sampleRate;
+          const de = Math.round((ini - s.timestamp) * taxa), ate = Math.min(s.buffer.length, Math.round((fim - s.timestamp) * taxa));
+          if (ate - de <= 0) continue;
+          const pedaco = new AudioBuffer({ length: ate - de, numberOfChannels: s.buffer.numberOfChannels, sampleRate: taxa });
+          for (let ch = 0; ch < s.buffer.numberOfChannels; ch++) pedaco.copyToChannel(s.buffer.getChannelData(ch).subarray(de, ate), ch);
+          await audio.add(pedaco);
+        }
+      }
+      tSaida += n / fps;
+    }
+    await output.finalize();
+  } catch (e) {
+    await output.cancel().catch(() => {});
+    throw e;
+  } finally {
+    logo?.close();
+  }
+  const buffer = (output.target as InstanceType<typeof mb.BufferTarget>).buffer!;
+  opcoes.aoProgresso?.(1);
+  return { blob: new Blob([buffer], { type: "video/mp4" }), mime: "video/mp4", duracao: tSaida };
+}
+
+/** Monta o vídeo final: quadro a quadro quando o navegador permite (o normal); senão, gravando a reprodução. */
+export async function montarVideo(blob: Blob, plano: PlanoEdicao, palavras: Palavra[], opcoes: Opcoes = {}) {
+  try {
+    return await montarQuadroAQuadro(blob, plano, palavras, opcoes);
+  } catch (e) {
+    if (!(e instanceof SemSuporte)) console.warn("Montagem quadro a quadro falhou, usando a gravação:", e);
+    return montarGravando(blob, plano, palavras, opcoes);
+  }
+}
+
+/**
+ * Plano B (navegadores sem WebCodecs): toca os trechos e grava o canvas junto com o áudio, em tempo real.
+ * Cada quadro é desenhado quando o vídeo entrega um quadro novo, e a gravação só volta depois que o trecho começa a tocar.
+ */
+async function montarGravando(
   blob: Blob,
   plano: PlanoEdicao,
   palavras: Palavra[],
-  opcoes: { logo?: Blob | null; aoProgresso?: (p: number) => void } = {},
+  opcoes: Opcoes = {},
 ): Promise<{ blob: Blob; mime: string; duracao: number }> {
   const url = URL.createObjectURL(blob);
   const v = document.createElement("video");
   v.src = url;
   v.playsInline = true;
   v.preload = "auto";
+  // No documento (quase invisível) para o navegador não reduzir a decodificação de um vídeo "fora da página".
+  Object.assign(v.style, { position: "fixed", left: "0", top: "0", width: "2px", height: "2px", opacity: "0.01", pointerEvents: "none" });
+  document.body.appendChild(v);
   await esperar(v, "loadedmetadata");
   const [W, H] = TAMANHOS[plano.formato] ?? (() => {
     const escala = Math.min(1, 1920 / Math.max(v.videoWidth, v.videoHeight));
@@ -254,8 +434,6 @@ export async function montarVideo(
   canvas.height = H;
   const g = canvas.getContext("2d")!;
   const logo = opcoes.logo && plano.logo.ativo ? await createImageBitmap(opcoes.logo) : null;
-
-  // Áudio: passa pelo WebAudio direto para a gravação (não toca nos alto-falantes).
   const audio = new AudioContext();
   await audio.resume().catch(() => {});
   const destino = audio.createMediaStreamDestination();
@@ -263,115 +441,50 @@ export async function montarVideo(
   const fluxo = canvas.captureStream(30);
   destino.stream.getAudioTracks().forEach((t) => fluxo.addTrack(t));
   const mime = tipoDeGravacao();
-  const gravador = new MediaRecorder(fluxo, { mimeType: mime, videoBitsPerSecond: 6_000_000, audioBitsPerSecond: 128_000 });
+  const gravador = new MediaRecorder(fluxo, { mimeType: mime, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 });
   const partes: Blob[] = [];
   gravador.ondataavailable = (e) => e.data.size && partes.push(e.data);
   const fim = new Promise<void>((ok) => (gravador.onstop = () => ok()));
-
   const blocos = blocosDeLegenda(palavras);
   const total = duracaoFinal(plano);
-  const L = plano.legendas;
-  const fonte = Math.round(W * ({ p: 0.045, m: 0.058, g: 0.072 }[L.tamanho] ?? 0.058));
   let acumulado = 0;
-  let corteAtual = plano.cortes[0];
-
+  let corte = plano.cortes[0];
   const desenhar = () => {
-    // Vídeo cobrindo o quadro (corta as sobras do centro).
     const vw = v.videoWidth || W, vh = v.videoHeight || H;
     const escala = Math.max(W / vw, H / vh);
-    const dw = vw * escala, dh = vh * escala;
     g.fillStyle = "#000";
     g.fillRect(0, 0, W, H);
-    g.drawImage(v, (W - dw) / 2, (H - dh) / 2, dw, dh);
-    const tFonte = v.currentTime;
-    const tFinal = acumulado + Math.max(0, tFonte - corteAtual.inicio);
-
-    // Legendas (palavra falada agora em destaque).
-    if (L.ativo) {
-      const b = blocos.find((x) => tFonte >= x.inicio - 0.05 && tFonte <= x.fim + 0.15);
-      if (b) {
-        g.font = `800 ${fonte}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
-        g.textAlign = "left";
-        g.textBaseline = "middle";
-        const palavrasB = b.palavras.map((p) => ({ ...p, texto: L.maiusculas ? p.texto.toUpperCase() : p.texto }));
-        const espaco = g.measureText(" ").width;
-        const linhas: (typeof palavrasB)[] = [[]];
-        let largura = 0;
-        for (const p of palavrasB) {
-          const w = g.measureText(p.texto).width;
-          if (largura + w > W * 0.84 && linhas[linhas.length - 1].length) {
-            linhas.push([]);
-            largura = 0;
-          }
-          linhas[linhas.length - 1].push(p);
-          largura += w + espaco;
-        }
-        const yBase = L.posicao === "topo" ? H * 0.16 : L.posicao === "meio" ? H * 0.5 : H * 0.78;
-        linhas.forEach((linha, i) => {
-          const wLinha = linha.reduce((s, p) => s + g.measureText(p.texto).width, 0) + espaco * (linha.length - 1);
-          let x = (W - wLinha) / 2;
-          const y = yBase + (i - (linhas.length - 1) / 2) * fonte * 1.25;
-          for (const p of linha) {
-            g.lineWidth = fonte * 0.16;
-            g.strokeStyle = "rgba(0,0,0,.85)";
-            g.lineJoin = "round";
-            g.strokeText(p.texto, x, y);
-            g.fillStyle = tFonte >= p.inicio && tFonte <= p.fim + 0.05 ? L.destaque : L.cor;
-            g.fillText(p.texto, x, y);
-            x += g.measureText(p.texto).width + espaco;
-          }
-        });
-      }
-    }
-
-    // Textos na tela (gancho, chamada para ação).
-    for (const t of plano.textos) {
-      if (tFinal < t.inicio || tFinal > t.fim) continue;
-      const tam = Math.round(W * 0.05);
-      g.font = `800 ${tam}px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif`;
-      g.textAlign = "center";
-      g.textBaseline = "middle";
-      const w = Math.min(W * 0.9, g.measureText(t.texto).width + tam * 1.2);
-      const y = t.posicao === "topo" ? H * 0.09 : t.posicao === "meio" ? H * 0.42 : H * 0.9;
-      g.fillStyle = "rgba(0,0,0,.6)";
-      g.beginPath();
-      g.roundRect((W - w) / 2, y - tam * 0.85, w, tam * 1.7, tam * 0.5);
-      g.fill();
-      g.fillStyle = L.cor;
-      g.fillText(t.texto, W / 2, y, W * 0.86);
-    }
-
-    // Logo.
-    if (logo) {
-      const lw = W * 0.14, lh = (logo.height / logo.width) * lw, m = W * 0.04;
-      const x = plano.logo.posicao.endsWith("direita") ? W - lw - m : m;
-      const y = plano.logo.posicao.startsWith("topo") ? m : H - lh - m;
-      g.globalAlpha = 0.92;
-      g.drawImage(logo, x, y, lw, lh);
-      g.globalAlpha = 1;
-    }
-    opcoes.aoProgresso?.(Math.min(1, tFinal / Math.max(0.1, total)));
+    g.drawImage(v, (W - vw * escala) / 2, (H - vh * escala) / 2, vw * escala, vh * escala);
+    const tFinal = acumulado + Math.max(0, v.currentTime - corte.inicio);
+    desenharSobreposicoes(g, W, H, plano, blocos, logo, v.currentTime, tFinal);
+    opcoes.aoProgresso?.(Math.min(0.99, tFinal / Math.max(0.1, total)));
   };
-
+  const proximoQuadro = (cb: () => void) =>
+    "requestVideoFrameCallback" in v
+      ? (v as HTMLVideoElement & { requestVideoFrameCallback: (f: () => void) => number }).requestVideoFrameCallback(cb)
+      : requestAnimationFrame(cb);
   try {
     gravador.start(250);
     gravador.pause();
     for (const c of plano.cortes) {
-      corteAtual = c;
+      corte = c;
       v.currentTime = c.inicio;
       await esperar(v, "seeked");
       desenhar();
-      gravador.resume();
+      // Só volta a gravar quando o trecho já está tocando (evita a imagem parada no começo de cada corte).
+      const tocando = esperar(v, "playing");
       await v.play();
+      await tocando;
+      gravador.resume();
       await new Promise<void>((ok) => {
         const passo = () => {
           desenhar();
           if (v.currentTime >= c.fim || v.ended) {
             v.pause();
             ok();
-          } else requestAnimationFrame(passo);
+          } else proximoQuadro(passo);
         };
-        requestAnimationFrame(passo);
+        proximoQuadro(passo);
       });
       gravador.pause();
       acumulado += c.fim - c.inicio;
@@ -380,6 +493,7 @@ export async function montarVideo(
     await fim;
   } finally {
     v.pause();
+    v.remove();
     URL.revokeObjectURL(url);
     logo?.close();
     audio.close().catch(() => {});

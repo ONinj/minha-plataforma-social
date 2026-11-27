@@ -138,7 +138,7 @@ export default function Editor({ ir }: { ir: (a: IdAba) => void }) {
       <p className="ajuda" style={{ marginTop: 0 }}>
         Mande um vídeo gravado (bruto) e diga o que quer. O Claude ouve, olha os trechos, corta silêncios e erros, coloca
         legendas e textos nas cores da marca e sugere onde o vídeo entra no seu planejamento. O vídeo é montado aqui no
-        navegador: deixe esta aba aberta enquanto monta.
+        navegador, quadro a quadro, sem perder qualidade.
       </p>
 
       {/* 1. Escolher o vídeo */}
@@ -297,7 +297,7 @@ export default function Editor({ ir }: { ir: (a: IdAba) => void }) {
               <div className="barra" style={{ marginTop: 10 }}>
                 <div style={{ width: `${Math.round(progresso * 100)}%` }} />
               </div>
-              <p className="ajuda" style={{ marginBottom: 0 }}>Montando em tempo real ({Math.round(progresso * 100)}%). Deixe esta aba aberta e visível.</p>
+              <p className="ajuda" style={{ marginBottom: 0 }}>Montando quadro a quadro ({Math.round(progresso * 100)}%). Não feche esta aba.</p>
             </>
           )}
         </div>

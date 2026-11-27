@@ -17,8 +17,9 @@ Aba **Editor de vídeo** (menu Criar). Não precisa configurar nada.
 - A montagem acontece no navegador da pessoa: não gasta créditos.
 
 ## Limites (primeira versão)
-- A montagem leva o mesmo tempo do vídeo final e precisa da aba **aberta e visível**.
-- Chrome, Edge e Safari gravam em **MP4** (bom para o Instagram). O Firefox grava em WebM (o app avisa).
+- A montagem é feita **quadro a quadro** (WebCodecs, biblioteca Mediabunny): não perde quadros, respeita a rotação
+  do celular e costuma ser mais rápida que o tempo do vídeo. Não feche a aba enquanto monta.
+- Sai em **MP4 (H.264)**. Em navegadores sem esse recurso, o editor grava a reprodução (mais lento; pode sair em WebM).
 - Sem efeitos e transições elaborados, correção de cor ou músicas da biblioteca do Instagram.
 - O logo vem da pasta **Identidade visual** da Biblioteca (o questionário do perfil já salva lá).
 - Vídeos de celular em HEVC só abrem em navegadores que tocam HEVC (Chrome e Safari recentes).
