@@ -5,6 +5,7 @@ import { verificarVideos } from "@/lib/servicos";
 import { StoreProvider, totalContaMes, totalMes, useStore } from "@/lib/store";
 import { formatarCreditos } from "@/lib/custo";
 import { atualizarConexoes, sincronizarPublicacoes } from "@/lib/instagram";
+import { sincronizarDecisoes } from "@/lib/aprovacaoCliente";
 import { MODO_NUVEM, eventosNuvem, pediuNovaSenha } from "@/lib/nuvem";
 import { brl } from "@/lib/util";
 import Admin from "./abas/Admin";
@@ -160,6 +161,16 @@ function Plataforma() {
     const t = setInterval(tick, 30000);
     return () => clearInterval(t);
   }, [temPublicacaoPendente, marca.id, !!store.nuvem]);
+
+  // Respostas dos clientes pelo link de aprovação (a cada minuto, só para perfis com peças aguardando).
+  const temAguardando = estado.aprovacoes.some((a) => a.status === "pendente" || a.status === "ajuste");
+  useEffect(() => {
+    if (!store.nuvem || !temAguardando) return;
+    const tick = () => sincronizarDecisoes(storeRef.current).catch(() => {});
+    tick();
+    const t = setInterval(tick, 60000);
+    return () => clearInterval(t);
+  }, [temAguardando, marca.id, !!store.nuvem]);
 
   // Mostra no título da aba do navegador quantos vídeos estão sendo feitos.
   const qtdGerando = conta.marcas.reduce((n, m) => n + m.midias.filter((x) => x.status === "gerando").length, 0);

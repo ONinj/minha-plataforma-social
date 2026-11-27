@@ -384,3 +384,17 @@ label { display: block; font-size: 12.5px; color: var(--texto-2); margin-bottom:
   .vendas-secao { padding-top: 52px; }
   .vendas .planos { grid-template-columns: 1fr; }
 }
+
+/* ---------------- Página de aprovação do cliente ---------------- */
+.aprovar { position: relative; z-index: 1; min-height: 100dvh; }
+.aprovar-largura { width: min(640px, 100%); margin: 0 auto; padding: 0 16px; }
+.aprovar-topo { padding: 22px 0 18px; border-top: 4px solid var(--destaque); background: rgba(7, 8, 13, 0.6); border-bottom: 1px solid var(--borda); margin-bottom: 18px; }
+.aprovar-topo h1 { font-size: 22px; letter-spacing: -0.02em; margin: 18px 0 6px; }
+.aprovar-avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: white; font-weight: 700; flex-shrink: 0; }
+.aprovar-peca { margin-bottom: 16px; }
+.aprovar-midias { display: grid; gap: 8px; }
+.aprovar-midias.varias { grid-auto-flow: column; grid-auto-columns: 85%; overflow-x: auto; scroll-snap-type: x mandatory; }
+.aprovar-midias img, .aprovar-midias video { width: 100%; border-radius: 12px; display: block; background: #000; scroll-snap-align: start; max-height: 70vh; object-fit: contain; }
+.aprovar-legenda { white-space: pre-wrap; margin-top: 12px; font-size: 14.5px; line-height: 1.55; color: var(--texto); }
+.aprovar-botoes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.aprovar-botoes .botao { justify-content: center; padding: 13px; font-size: 15px; }

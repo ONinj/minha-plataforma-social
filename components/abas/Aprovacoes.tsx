@@ -7,6 +7,9 @@ import { REDES, type Agendamento, type Aprovacao } from "@/lib/tipos";
 import { agoraISO, formatarData, novoId } from "@/lib/util";
 import Markdown from "../Markdown";
 import { BotaoBaixar, CartaoMidia } from "../MidiaView";
+import EnviarCliente from "../EnviarCliente";
+import { sincronizarDecisoes } from "@/lib/aprovacaoCliente";
+import { useEffect } from "react";
 
 const FILTROS: { id: Aprovacao["status"] | "todos"; nome: string }[] = [
   { id: "pendente", nome: "Aguardando" },
@@ -24,12 +27,27 @@ const NOMES_STATUS: Record<Aprovacao["status"], string> = {
 };
 
 export default function Aprovacoes({ falarComGerente }: { falarComGerente: (texto: string) => void }) {
-  const { estado } = useStore();
+  const store = useStore();
+  const { estado } = store;
   const [filtro, setFiltro] = useState<(typeof FILTROS)[number]["id"]>("pendente");
+  const [enviar, setEnviar] = useState(false);
+  useEffect(() => {
+    if (store.nuvem) sincronizarDecisoes(store).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.marca.id]);
   const itens = estado.aprovacoes.filter((a) => filtro === "todos" || a.status === filtro);
 
   return (
     <div className="conteudo">
+      {store.nuvem && (
+        <div className="linha" style={{ justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+          <span className="ajuda" style={{ margin: 0 }}>Mande as peças para o cliente aprovar pelo celular, sem login.</span>
+          <button className="botao sec peq" onClick={() => setEnviar(true)}>
+            📤 Enviar para o cliente aprovar
+          </button>
+        </div>
+      )}
+      {enviar && <EnviarCliente aoFechar={() => setEnviar(false)} />}
       <div className="filtros">
         {FILTROS.map((f) => {
           const n = f.id === "todos" ? estado.aprovacoes.length : estado.aprovacoes.filter((a) => a.status === f.id).length;
@@ -180,6 +198,36 @@ function ItemAprovacao({ item, falarComGerente }: { item: Aprovacao; falarComGer
 
       {item.observacoes && <p className="ajuda">📝 {item.observacoes}</p>}
       {item.feedback && <p className="ajuda">🔁 Ajuste pedido: {item.feedback}</p>}
+      {item.cliente && (
+        <div
+          className="cartao"
+          style={{ padding: "10px 12px", borderColor: item.cliente.decisao === "aprovado" ? "rgba(34,197,94,.45)" : "rgba(245,158,11,.5)" }}
+        >
+          <b style={{ color: item.cliente.decisao === "aprovado" ? "var(--ok)" : "var(--alerta)" }}>
+            {item.cliente.decisao === "aprovado" ? "✅ O cliente aprovou" : "✏️ O cliente pediu ajuste"}
+          </b>
+          <span className="ajuda">
+            {" "}
+            · {item.cliente.nome || "cliente"} · {formatarData(item.cliente.em)}
+          </span>
+          {item.cliente.comentario && <p style={{ margin: "6px 0 0" }}>&ldquo;{item.cliente.comentario}&rdquo;</p>}
+          {editavel && item.cliente.decisao === "ajuste" && item.cliente.comentario && (
+            <button
+              className="botao peq"
+              style={{ marginTop: 8 }}
+              onClick={() => {
+                const texto = `O cliente pediu: ${item.cliente!.comentario}`;
+                atualizar({ status: "ajuste", feedback: texto, legenda, hashtags, redes, dataPublicacao: data || undefined });
+                falarComGerente(
+                  `O cliente pediu ajuste no item "${item.titulo}" (id ${item.id}): ${item.cliente!.comentario}\nRefaça o que for preciso e envie uma nova versão para aprovação.`,
+                );
+              }}
+            >
+              Mandar o ajuste para o gerente
+            </button>
+          )}
+        </div>
+      )}
 
       {editavel && (
         <>

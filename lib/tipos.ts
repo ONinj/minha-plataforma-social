@@ -60,6 +60,8 @@ export type Aprovacao = {
   feedback?: string;
   /** Sugestão do gerente: publicar sozinho na data (true) ou o usuário posta manualmente (false). */
   publicarAuto?: boolean;
+  /** Resposta do cliente final pelo link de aprovação. */
+  cliente?: { decisao: "aprovado" | "ajuste"; comentario?: string | null; nome?: string | null; em: string };
   criadoEm: string;
 };
 
