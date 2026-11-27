@@ -7,6 +7,7 @@ import type { Configuracoes as Config } from "@/lib/tipos";
 import { MODO_NUVEM } from "@/lib/nuvem";
 import Icone from "../Icone";
 import { MetricoolProprio } from "../Metricool";
+import Equipe from "../Equipe";
 
 const ORDEM_ESFORCO = ["low", "medium", "high", "xhigh", "max"];
 
@@ -190,6 +191,7 @@ export default function Configuracoes() {
         </p>
       </div>
 
+      {MODO_NUVEM && <Equipe />}
       {MODO_NUVEM && <MetricoolProprio />}
 
       <div className="cartao">

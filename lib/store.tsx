@@ -254,6 +254,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       ref.current = r;
       setRaiz(r);
       setNuvem(info);
+      try {
+        localStorage.setItem("conta-ativa", info.conta.id);
+      } catch {}
       sinc.current?.marcarSalvo(r);
       ultimaSincronia.current = ultimo;
       setSessao("pronta");
@@ -289,7 +292,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         if (iniciou) return;
         iniciou = true;
         try {
-          await carregarNuvem();
+          // Abre na última conta usada (quem faz parte de uma equipe volta para ela).
+          let salva: string | null = null;
+          try {
+            salva = localStorage.getItem("conta-ativa");
+          } catch {}
+          try {
+            await carregarNuvem(salva ?? undefined);
+          } catch (e) {
+            if (!salva || (e as { codigo?: string }).codigo !== "sem_conta") throw e;
+            await carregarNuvem();
+          }
         } catch (e) {
           iniciou = false;
           const codigo = (e as { codigo?: string }).codigo;

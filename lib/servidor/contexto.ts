@@ -85,6 +85,8 @@ export type Recursos = {
   perfis_publicacao?: number;
   /** Espaço para arquivos da conta, em GB. */
   armazenamento_gb?: number;
+  /** Quantas pessoas (com o dono) podem usar a conta. */
+  max_membros?: number;
 };
 
 export type Precos = {

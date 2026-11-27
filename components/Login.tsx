@@ -37,7 +37,11 @@ function useConfiguracaoLogin() {
 }
 
 /** Tela de entrada: e-mail e senha, link por e-mail (sem senha) ou Google. */
-export default function Login({ modoInicial = "entrar", aoVoltar }: { modoInicial?: "entrar" | "criar"; aoVoltar?: () => void } = {}) {
+export default function Login({
+  modoInicial = "entrar",
+  aoVoltar,
+  voltarPara,
+}: { modoInicial?: "entrar" | "criar"; aoVoltar?: () => void; voltarPara?: string } = {}) {
   const cfg = useConfiguracaoLogin();
   const [modo, setModo] = useState<Modo>(modoInicial);
   const [email, setEmail] = useState("");
@@ -63,7 +67,7 @@ export default function Login({ modoInicial = "entrar", aoVoltar }: { modoInicia
         if (error) throw error;
         // Deu certo: a plataforma abre sozinha.
       } else if (modo === "criar") {
-        const { data, error } = await sb.signUp({ email: em, password: senha, options: { emailRedirectTo: window.location.origin } });
+        const { data, error } = await sb.signUp({ email: em, password: senha, options: { emailRedirectTo: voltarPara ?? window.location.origin } });
         if (error) throw error;
         if (!data.session) {
           setAviso({
@@ -72,7 +76,7 @@ export default function Login({ modoInicial = "entrar", aoVoltar }: { modoInicia
           });
         }
       } else if (modo === "link") {
-        const { error } = await sb.signInWithOtp({ email: em, options: { emailRedirectTo: window.location.origin } });
+        const { error } = await sb.signInWithOtp({ email: em, options: { emailRedirectTo: voltarPara ?? window.location.origin } });
         if (error) throw error;
         setAviso({ titulo: "📬 Confira seu e-mail", texto: `Mandamos um link de acesso para ${em}. Abra o e-mail neste mesmo aparelho e clique no link.` });
       } else {
@@ -89,7 +93,7 @@ export default function Login({ modoInicial = "entrar", aoVoltar }: { modoInicia
 
   async function entrarComGoogle() {
     setErro(undefined);
-    const { error } = await supabase().auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+    const { error } = await supabase().auth.signInWithOAuth({ provider: "google", options: { redirectTo: voltarPara ?? window.location.origin } });
     if (error) setErro(traduzirErro(error.message));
   }
 

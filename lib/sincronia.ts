@@ -37,6 +37,7 @@ export type InfoNuvem = {
     extras?: string[];
     publicacao_mensal?: { reels: number; stories: number; posts: number } | null;
     perfis_publicacao?: number;
+    max_membros?: number;
   };
   cambio: number;
   precos: {
@@ -101,7 +102,8 @@ export async function carregarDaNuvem(contaPedida?: string): Promise<{ raiz: Rai
   const info = await api<InfoNuvem>("/api/conta");
   definirContaAtual(info.conta.id);
   const { perfis } = await api<{ perfis: LinhaPerfil[] }>("/api/perfis");
-  const marcas = perfis.filter((p) => !p.apagado).map((p) => p.dados);
+  // Completa campos que faltarem (perfis antigos ou incompletos não derrubam a tela).
+  const marcas = perfis.filter((p) => !p.apagado).map((p) => ({ ...marcaVazia(p.dados?.nome ?? "Perfil"), ...p.dados, id: p.id }));
   const ultimo = perfis.reduce((m, p) => Math.max(m, p.em), 0);
   if (!marcas.length) {
     // Conta nova: cria o primeiro perfil já salvo na nuvem (o id precisa ser o mesmo em toda visita).

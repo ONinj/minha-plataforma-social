@@ -57,3 +57,9 @@ Pronto. O cliente vê em **Perfis e redes**: "✅ Pronto para publicar sozinho" 
 - **"Metricool (401)"**: userId ou token errados. Confira na aba API do Metricool.
 - **"Essa data já passou"**: o Metricool só aceita horários futuros. Use "Publicar agora".
 - **Erro no post**: abra o Metricool e veja a marca. Geralmente é a rede desconectada (mande o link de conexão de novo).
+
+## ⚠️ Pendente para quando o Metricool for ligado
+Assim que a publicação pelo Metricool estiver funcionando com clientes reais, o próximo passo combinado é o
+**relatório mensal com métricas**: puxar curtidas, alcance, seguidores e os melhores posts de cada perfil pela API do
+Metricool e gerar um resumo escrito pelo Claude, pronto para mandar ao cliente. (Foi adiado de propósito em
+novembro de 2026 porque depende do Metricool Advanced.)
