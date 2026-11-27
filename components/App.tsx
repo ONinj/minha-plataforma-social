@@ -6,9 +6,11 @@ import { StoreProvider, totalContaMes, totalMes, useStore } from "@/lib/store";
 import { formatarCreditos } from "@/lib/custo";
 import { atualizarConexoes, sincronizarPublicacoes } from "@/lib/instagram";
 import { sincronizarDecisoes } from "@/lib/aprovacaoCliente";
-import { MODO_NUVEM, eventosNuvem, pediuNovaSenha } from "@/lib/nuvem";
+import { MODO_NUVEM, api, eventosNuvem, pediuNovaSenha } from "@/lib/nuvem";
 import { brl } from "@/lib/util";
 import Admin from "./abas/Admin";
+import SuporteEquipe from "./abas/Suporte";
+import BotaoSuporte from "./Suporte";
 import Plano from "./abas/Plano";
 import { NovaSenha } from "./Login";
 import PaginaVendas from "./PaginaVendas";
@@ -46,6 +48,7 @@ export type IdAba =
   | "perfis"
   | "plano"
   | "admin"
+  | "suporte"
   | "config";
 
 type Aba = { id: IdAba; nome: string; icone: string; descricao: string; cor?: string };
@@ -79,6 +82,7 @@ const SECOES: { titulo?: string; abas: Aba[] }[] = [
       { id: "perfis", nome: "Perfis e redes", icone: "perfis", descricao: "Os perfis (clientes) desta conta e as redes conectadas" },
       { id: "plano", nome: "Plano e créditos", icone: "carteira", descricao: "Seu plano, saldo de créditos, recargas e extrato" },
       { id: "config", nome: "Configurações", icone: "config", descricao: "Modelos, confirmações e dados" },
+      { id: "suporte", nome: "Suporte (equipe)", icone: "chat", descricao: "Conversas dos clientes com a equipe" },
       { id: "admin", nome: "Administração", icone: "estrela", descricao: "Contas, planos e créditos de todos os clientes" },
     ],
   },
@@ -98,6 +102,7 @@ function Plataforma() {
   const { estado, carregado, conta, marca, raiz } = store;
   const [aba, setAba] = useState<IdAba>("inicio");
   const [menuAberto, setMenuAberto] = useState(false);
+  const suporteNovas = useSuporteNovas(!!store.nuvem?.usuario.admin);
   const [paraGerente, setParaGerente] = useState<string>();
   const [anexosParaGerente, setAnexosParaGerente] = useState<string[]>();
 
@@ -217,7 +222,7 @@ function Plataforma() {
   const travada = (id: IdAba) =>
     !!nuvem && ((id === "seedance" && !nuvem.recursos.seedance) || (id === "biblioteca" && !nuvem.recursos.biblioteca));
   const visivel = (id: IdAba) =>
-    (id !== "plano" || MODO_NUVEM) && (id !== "admin" || !!nuvem?.usuario.admin);
+    (id !== "plano" || MODO_NUVEM) && (!["admin", "suporte"].includes(id) || !!nuvem?.usuario.admin);
   const atual = TODAS.find((a) => a.id === aba)!;
   const pendentes = estado.aprovacoes.filter((a) => a.status === "pendente").length;
   const cambio = conta.config.cambio;
@@ -261,6 +266,7 @@ function Plataforma() {
                 <Icone nome={a.icone} />
                 {a.nome}
                 {a.id === "aprovacoes" && pendentes > 0 && <span className="contador">{pendentes}</span>}
+                {a.id === "suporte" && suporteNovas > 0 && <span className="contador">{suporteNovas}</span>}
                 {travada(a.id) ? (
                   <span className="trava" title="Não incluído no seu plano">🔒</span>
                 ) : (
@@ -328,6 +334,7 @@ function Plataforma() {
                 <span className="girando" style={{ width: 11, height: 11, borderWidth: 2 }} /> {store.tarefa}
               </button>
             )}
+            {nuvem && <BotaoSuporte />}
             <Notificacoes ir={ir} />
             {nuvem ? (
               <MenuUsuario ir={ir} />
@@ -410,6 +417,7 @@ function Plataforma() {
           {aba === "config" && <Configuracoes />}
           {aba === "plano" && nuvem && <Plano />}
           {aba === "admin" && nuvem?.usuario.admin && <Admin />}
+          {aba === "suporte" && nuvem?.usuario.admin && <SuporteEquipe />}
         </div>
       </main>
       <Avisos />
@@ -667,4 +675,17 @@ function MenuUsuario({ ir }: { ir: (a: IdAba) => void }) {
       )}
     </div>
   );
+}
+
+/** Quantas conversas de suporte têm mensagens novas (só para a equipe). */
+function useSuporteNovas(admin: boolean) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    if (!admin) return;
+    const ver = () => api<{ nao_lidas: number }>("/api/admin/suporte?resumo=1").then((r) => setN(r.nao_lidas)).catch(() => {});
+    ver();
+    const t = setInterval(ver, 30000);
+    return () => clearInterval(t);
+  }, [admin]);
+  return n;
 }

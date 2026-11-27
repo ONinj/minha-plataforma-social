@@ -55,11 +55,16 @@ export default function PaginaVendas() {
   const [login, setLogin] = useState<null | "entrar" | "criar">(null);
   const [dados, setDados] = useState<Planos | null>(null);
   const [aberta, setAberta] = useState<number | null>(0);
+  const [depoimentos, setDepoimentos] = useState<{ id: string; nome: string; cargo: string | null; texto: string; nota: number }[]>([]);
 
   useEffect(() => {
     fetch("/api/planos")
       .then((r) => r.json())
       .then((d: Planos) => setDados(d.planos?.length ? d : null))
+      .catch(() => {});
+    fetch("/api/depoimentos")
+      .then((r) => r.json())
+      .then((d) => setDepoimentos(d.depoimentos ?? []))
       .catch(() => {});
   }, []);
 
@@ -197,6 +202,24 @@ export default function PaginaVendas() {
                 </a>
               )}
             </div>
+          </div>
+        </section>
+      )}
+
+      {depoimentos.length > 0 && (
+        <section className="vendas-largura vendas-secao">
+          <h2>O que dizem</h2>
+          <div className="vendas-grade-3">
+            {depoimentos.map((d) => (
+              <figure key={d.id} className="cartao vendas-depoimento" style={{ margin: 0 }}>
+                <span className="vendas-estrelas" aria-label={`${d.nota} de 5 estrelas`}>{"★".repeat(d.nota)}</span>
+                <p>&ldquo;{d.texto}&rdquo;</p>
+                <figcaption className="ajuda" style={{ marginTop: "auto" }}>
+                  <b style={{ color: "var(--texto)" }}>{d.nome}</b>
+                  {d.cargo && <> · {d.cargo}</>}
+                </figcaption>
+              </figure>
+            ))}
           </div>
         </section>
       )}

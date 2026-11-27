@@ -8,6 +8,7 @@ import { brl, formatarData } from "@/lib/util";
 import Icone from "../Icone";
 import { AdminMetricool } from "../Metricool";
 import { PlanosAdmin, VisaoGeral, usePainel } from "./AdminPainel";
+import Depoimentos from "./Depoimentos";
 
 type ContaAdmin = {
   id: string;
@@ -31,7 +32,7 @@ export default function Admin() {
   const [dados, setDados] = useState<{ contas: ContaAdmin[]; planos: { id: string; nome: string }[] } | null>(null);
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<ContaAdmin | null>(null);
-  const [secao, setSecao] = useState<"geral" | "contas" | "planos">("geral");
+  const [secao, setSecao] = useState<"geral" | "contas" | "planos" | "depoimentos">("geral");
   const painel = usePainel();
 
   const carregar = useCallback(() => {
@@ -56,6 +57,7 @@ export default function Admin() {
           ["geral", "Visão geral"],
           ["contas", `Contas (${dados.contas.length})`],
           ["planos", "Planos e preços"],
+          ["depoimentos", "Depoimentos"],
         ] as const
       ).map(([id, nome]) => (
         <button key={id} className={`filtro ${secao === id ? "ativo" : ""}`} onClick={() => setSecao(id)}>
@@ -65,6 +67,14 @@ export default function Admin() {
       <button className="filtro" onClick={() => { carregar(); painel.carregar(); }}>↻ Atualizar</button>
     </div>
   );
+  if (secao === "depoimentos") {
+    return (
+      <div className="conteudo">
+        {abas}
+        <Depoimentos />
+      </div>
+    );
+  }
   if (secao !== "contas") {
     return (
       <div className="conteudo">
