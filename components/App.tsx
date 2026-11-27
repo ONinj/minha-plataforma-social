@@ -9,7 +9,8 @@ import { MODO_NUVEM, eventosNuvem, pediuNovaSenha } from "@/lib/nuvem";
 import { brl } from "@/lib/util";
 import Admin from "./abas/Admin";
 import Plano from "./abas/Plano";
-import Login, { NovaSenha } from "./Login";
+import { NovaSenha } from "./Login";
+import PaginaVendas from "./PaginaVendas";
 import Diagnostico from "./Diagnostico";
 import Agendamentos from "./abas/Agendamentos";
 import Aprovacoes from "./abas/Aprovacoes";
@@ -171,7 +172,7 @@ function Plataforma() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carregado]);
 
-  if (MODO_NUVEM && carregado && store.sessao === "sem_login") return <Login />;
+  if (MODO_NUVEM && carregado && store.sessao === "sem_login") return <PaginaVendas />;
   if (MODO_NUVEM && store.erroCarga && store.sessao !== "pronta") {
     return (
       <div className="tela-login">

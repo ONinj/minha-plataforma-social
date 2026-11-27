@@ -349,3 +349,38 @@ label { display: block; font-size: 12.5px; color: var(--texto-2); margin-bottom:
 @media (max-width: 560px) { .planos { grid-template-columns: 1fr; } }
 .link-botao { background: none; border: 0; padding: 2px; color: var(--texto-2); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .link-botao:hover { color: var(--texto); }
+
+/* ---------------- Página de vendas ---------------- */
+.vendas { position: relative; z-index: 1; min-height: 100dvh; overflow-x: hidden; }
+.vendas-largura { width: min(1160px, 100%); margin: 0 auto; padding: 0 20px; }
+.vendas-topo { position: sticky; top: 0; z-index: 20; padding: 12px 0; background: rgba(7, 8, 13, 0.7); backdrop-filter: blur(16px); border-bottom: 1px solid var(--borda); }
+.vendas-heroi { text-align: center; padding-top: 64px; padding-bottom: 20px; }
+.vendas-heroi h1 { font-size: clamp(30px, 5.2vw, 56px); line-height: 1.08; letter-spacing: -0.035em; margin: 18px auto 16px; max-width: 900px; }
+.vendas-heroi > p { font-size: clamp(15px, 2vw, 18px); color: var(--texto-2); max-width: 680px; margin: 0 auto 24px; line-height: 1.6; }
+.vendas-gradiente { background: var(--gradiente); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.vendas-print { width: 100%; height: auto; display: block; border-radius: 14px; border: 1px solid var(--borda-forte); box-shadow: 0 30px 80px -30px rgba(139, 92, 246, 0.55); }
+.vendas-print-grande { margin-top: 40px; }
+.vendas-secao { padding-top: 72px; }
+.vendas-secao h2 { text-align: center; font-size: clamp(22px, 3.2vw, 32px); letter-spacing: -0.02em; margin: 0 0 24px; }
+.vendas-grade-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.vendas-grade-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.vendas-grade-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.vendas-numero { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--gradiente); color: white; font-weight: 700; }
+.vendas-icone { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: rgba(139, 92, 246, 0.16); color: var(--destaque-2); }
+.vendas-tela { margin: 0; }
+.vendas-tela figcaption { margin-top: 10px; font-size: 14px; }
+.vendas-pergunta { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 18px; background: none; border: 0; color: var(--texto); font: inherit; text-align: left; cursor: pointer; }
+.vendas-pergunta span { font-size: 20px; color: var(--destaque-2); }
+.vendas-final { text-align: center; padding-bottom: 40px; }
+.vendas-rodape { margin-top: 40px; padding: 24px 0; border-top: 1px solid var(--borda); font-size: 13px; color: var(--texto-2); }
+.vendas-rodape a { color: var(--texto-2); }
+@media (max-width: 960px) {
+  .vendas-grade-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vendas-grade-3 { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .vendas-grade-2, .vendas-grade-4 { grid-template-columns: 1fr; }
+  .vendas-heroi { padding-top: 40px; }
+  .vendas-secao { padding-top: 52px; }
+  .vendas .planos { grid-template-columns: 1fr; }
+}

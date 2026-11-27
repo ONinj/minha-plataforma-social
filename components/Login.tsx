@@ -37,9 +37,9 @@ function useConfiguracaoLogin() {
 }
 
 /** Tela de entrada: e-mail e senha, link por e-mail (sem senha) ou Google. */
-export default function Login() {
+export default function Login({ modoInicial = "entrar", aoVoltar }: { modoInicial?: "entrar" | "criar"; aoVoltar?: () => void } = {}) {
   const cfg = useConfiguracaoLogin();
-  const [modo, setModo] = useState<Modo>("entrar");
+  const [modo, setModo] = useState<Modo>(modoInicial);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [aviso, setAviso] = useState<{ titulo: string; texto: string } | null>(null);
@@ -104,6 +104,11 @@ export default function Login() {
   return (
     <div className="tela-login">
       <div className="login-caixa">
+        {aoVoltar && (
+          <button className="link-botao" style={{ marginBottom: 10, fontSize: 13 }} onClick={aoVoltar}>
+            ← Voltar
+          </button>
+        )}
         <div className="logo" style={{ justifyContent: "center", padding: 0, marginBottom: 18 }}>
           <Logo tamanho={30} />
           <div>
@@ -182,6 +187,13 @@ export default function Login() {
               </button>
             </form>
             {erro && <div className="erro-msg">{erro}</div>}
+            {modo === "criar" && (
+              <p className="ajuda" style={{ fontSize: 12, textAlign: "center", margin: "10px 0 0" }}>
+                Ao criar a conta, você concorda com os{" "}
+                <a href="/termos" target="_blank" rel="noreferrer">Termos de uso</a> e a{" "}
+                <a href="/privacidade" target="_blank" rel="noreferrer">Política de privacidade</a>.
+              </p>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center", marginTop: 14, fontSize: 13 }}>
               {modo === "entrar" && (
                 <button className="link-botao" onClick={() => trocar("esqueci")}>
