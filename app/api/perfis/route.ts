@@ -21,7 +21,8 @@ export async function PUT(req: Request) {
   try {
     const ctx = await contexto(req);
     const { id, dados } = (await req.json()) as { id: string; dados: unknown };
-    if (!id || !dados) throw new ErroHttp(400, "Perfil inválido.");
+    if (!id || !dados || typeof id !== "string" || id.length > 80) throw new ErroHttp(400, "Perfil inválido.");
+    if (JSON.stringify(dados).length > 4_000_000) throw new ErroHttp(413, "Este perfil ficou grande demais. Limpe a conversa da Central ou do Claude dele em Configurações.");
     const db = sql();
     const [existe] = await db`select conta_id from perfis where id = ${id}`;
     if (existe && existe.conta_id !== ctx.conta.id) throw new ErroHttp(403, "Perfil de outra conta.");

@@ -225,6 +225,10 @@ async function processarFila() {
     enviando++;
     enviarArquivo(item.id, item.blob)
       .catch(async (e) => {
+        if ((e as { codigo?: string }).codigo === "plano") {
+          console.warn("Envio bloqueado pelo plano (espaço cheio):", item.id);
+          return;
+        }
         console.warn("Falha ao enviar arquivo, tentando de novo em 20 s", item.id, e);
         await new Promise((r) => setTimeout(r, 20000));
         fila.push(item);

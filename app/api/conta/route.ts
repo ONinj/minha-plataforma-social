@@ -1,4 +1,4 @@
-import { MODO_NUVEM, contexto, responderErro, sql } from "@/lib/servidor/contexto";
+import { ErroHttp, MODO_NUVEM, contexto, responderErro, sql } from "@/lib/servidor/contexto";
 import { plataformaConfigurada } from "@/lib/servidor/metricool";
 import { alertaDeGasto } from "@/lib/servidor/painel";
 
@@ -44,6 +44,7 @@ export async function PATCH(req: Request) {
     const c = (await req.json()) as { nome?: string; preferencias?: Record<string, unknown> };
     const db = sql();
     if (c.nome) await db`update contas set nome = ${c.nome.slice(0, 80)} where id = ${ctx.conta.id}::uuid`;
+    if (c.preferencias && JSON.stringify(c.preferencias).length > 20_000) throw new ErroHttp(413, "Preferências grandes demais.");
     if (c.preferencias) await db`update contas set preferencias = ${db.json(c.preferencias as never)} where id = ${ctx.conta.id}::uuid`;
     return Response.json({ ok: true });
   } catch (e) {

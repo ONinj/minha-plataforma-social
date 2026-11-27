@@ -1,4 +1,4 @@
-import { ErroHttp, contexto, responderErro, sql } from "@/lib/servidor/contexto";
+import { ErroHttp, contexto, exigirPerfilDaConta, responderErro, sql } from "@/lib/servidor/contexto";
 import { credencialDaConta, listarMarcas, plataformaConfigurada, salvarCredencialPropria } from "@/lib/servidor/metricool";
 
 export const runtime = "nodejs";
@@ -54,6 +54,7 @@ export async function POST(req: Request) {
       return Response.json({ ok: true });
     }
     if (c.acao === "marca") {
+      await exigirPerfilDaConta(ctx.conta.id, c.perfil);
       // Só com o Metricool próprio: o cliente escolhe uma das marcas dele.
       const cred = await credencialDaConta(ctx.conta.id);
       if (cred?.origem !== "propria") throw new ErroHttp(403, "A marca do Metricool da plataforma é definida pela equipe.");
@@ -61,7 +62,8 @@ export async function POST(req: Request) {
       const m = marcas.find((x) => x.blogId === c.blogId);
       if (!m) throw new ErroHttp(400, "Marca não encontrada no seu Metricool.");
       await db`insert into metricool_marcas (perfil_id, conta_id, blog_id, nome, origem) values (${c.perfil}, ${ctx.conta.id}::uuid, ${m.blogId}, ${m.nome}, 'propria')
-        on conflict (perfil_id) do update set conta_id = excluded.conta_id, blog_id = excluded.blog_id, nome = excluded.nome, origem = 'propria', atualizado_em = now()`;
+        on conflict (perfil_id) do update set blog_id = excluded.blog_id, nome = excluded.nome, origem = 'propria', atualizado_em = now()
+        where metricool_marcas.conta_id = excluded.conta_id`;
       return Response.json({ ok: true });
     }
     if (c.acao === "remover-marca") {

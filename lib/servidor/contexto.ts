@@ -83,6 +83,8 @@ export type Recursos = {
   publicacao_mensal?: { reels: number; stories: number; posts: number } | null;
   /** Quantos perfis podem ter publicação automática pela plataforma. */
   perfis_publicacao?: number;
+  /** Espaço para arquivos da conta, em GB. */
+  armazenamento_gb?: number;
 };
 
 export type Precos = {
@@ -128,6 +130,44 @@ export function eAdmin(email: string) {
     .includes(email.toLowerCase());
 }
 
+const adminsConferidos = new Map<string, { ok: boolean; ate: number }>();
+
+/**
+ * Administrador = e-mail na lista ADMIN_EMAILS E e-mail CONFIRMADO no Supabase.
+ * (Sem a confirmação, alguém poderia criar conta com um e-mail da lista que ainda não foi usado.)
+ */
+export async function eAdminConfirmado(userId: string, email: string, token: string): Promise<boolean> {
+  if (!email || !eAdmin(email)) return false;
+  const cache = adminsConferidos.get(userId);
+  if (cache && cache.ate > Date.now()) return cache.ok;
+  let ok = false;
+  try {
+    // Pergunta ao Supabase, com o próprio login da pessoa, se o e-mail dela foi confirmado.
+    const chave = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || "";
+    const r = await fetch(`${urlSupabase()}/auth/v1/user`, { headers: { apikey: chave, Authorization: `Bearer ${token}` } });
+    if (r.ok) {
+      const u = (await r.json()) as { id?: string; email?: string; email_confirmed_at?: string | null };
+      ok = u.id === userId && !!u.email_confirmed_at && (u.email ?? "").toLowerCase() === email.toLowerCase();
+    }
+  } catch {
+    ok = false;
+  }
+  adminsConferidos.set(userId, { ok, ate: Date.now() + 10 * 60_000 });
+  return ok;
+}
+
+/** Quem chamou, sem precisar de conta no banco (usado pelo diagnóstico). */
+export async function usuarioDoToken(req: Request): Promise<{ userId: string; email: string; token: string } | null> {
+  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!token) return null;
+  try {
+    const p = await verificarToken(token);
+    return { userId: String(p.sub), email: String((p as { email?: string }).email ?? ""), token };
+  } catch {
+    return null;
+  }
+}
+
 /** Identifica quem chamou (token), a conta escolhida (x-conta-id) e o plano dela. */
 export async function contexto(req: Request, opcoes: { criarSeNaoExistir?: boolean } = {}): Promise<Contexto> {
   const auth = req.headers.get("authorization") ?? "";
@@ -163,7 +203,7 @@ export async function contexto(req: Request, opcoes: { criarSeNaoExistir?: boole
   return {
     userId,
     email,
-    admin: eAdmin(email),
+    admin: await eAdminConfirmado(userId, email, token),
     papel: c.papel,
     conta: {
       id: c.id,
@@ -225,12 +265,80 @@ export async function debitar(
   return ctx.conta.saldo;
 }
 
+/**
+ * Reserva créditos ANTES de chamar a IA. É atômico no banco: pedidos ao mesmo tempo não usam o mesmo saldo.
+ * Reserva até `max` (ou o saldo que houver), exigindo pelo menos `minimo`. Devolve a referência e o valor reservado.
+ */
+let semReserva = false;
+setInterval(() => (semReserva = false), 5 * 60_000).unref?.(); // volta a tentar a reserva (caso a migração tenha rodado)
+
+export async function reservar(ctx: Contexto, opcoes: { max: number; minimo: number; descricao: string; ref?: string }) {
+  if (ctx.conta.status === "atrasado") {
+    throw new ErroHttp(402, "Há um pagamento em aberto. Regularize em Plano e créditos para continuar.", "atrasado");
+  }
+  if (ctx.conta.status === "cancelado" && ctx.conta.saldo <= 0) {
+    throw new ErroHttp(402, "Sua assinatura foi cancelada. Escolha um plano para continuar.", "cancelado");
+  }
+  const ref = opcoes.ref ?? `res_${crypto.randomUUID()}`;
+  const max = Math.max(0, Math.round(opcoes.max * 1000) / 1000);
+  const minimo = Math.max(0.001, Math.min(max, Math.round(opcoes.minimo * 1000) / 1000));
+  try {
+    if (semReserva) throw new Error("function reservar does not exist");
+    const [r] = await sql()`select reservar(${ctx.conta.id}::uuid, ${ctx.userId}::uuid, ${max}, ${minimo}, ${opcoes.descricao}, ${ref}) as reservado`;
+    const reservado = Number(r.reservado);
+    ctx.conta.saldo = Math.round((ctx.conta.saldo - reservado) * 1000) / 1000;
+    return { ref, reservado, descricao: opcoes.descricao };
+  } catch (e) {
+    const msg = String(e instanceof Error ? e.message : e);
+    if (/function .*reservar.* does not exist|reservar.*does not exist/i.test(msg)) {
+      // Banco ainda sem a atualização 007: confere o saldo e cobra no fim (como antes), até a migração rodar.
+      semReserva = true;
+      if (ctx.conta.saldo < minimo) throw new ErroHttp(402, `Créditos insuficientes: esta ação usa cerca de ${opcoes.minimo.toFixed(1)} e você tem ${ctx.conta.saldo.toFixed(1)}. Faça uma recarga ou mude de plano.`, "sem_creditos");
+      return { ref: `legado_${ref}`, reservado: 0, descricao: opcoes.descricao };
+    }
+    if (msg.includes("saldo_insuficiente")) {
+      throw new ErroHttp(
+        402,
+        `Créditos insuficientes: esta ação usa cerca de ${opcoes.minimo.toFixed(1)} e você tem ${ctx.conta.saldo.toFixed(1)}. Faça uma recarga ou mude de plano.`,
+        "sem_creditos",
+      );
+    }
+    throw e;
+  }
+}
+
+/** Acerta a reserva pelo custo real (0 = cancela e devolve tudo). */
+export async function acertar(
+  ctx: Contexto,
+  ref: string,
+  creditosReais: number,
+  opcoes: { custoUsd?: number; descricao?: string; novoRef?: string; meta?: Record<string, unknown> } = {},
+) {
+  const real = Math.max(0, Math.round(creditosReais * 1000) / 1000);
+  if (ref.startsWith("legado_")) {
+    // Modo de compatibilidade: cobra o valor real agora.
+    if (real > 0) await debitar(ctx, real, opcoes.descricao ?? "Uso de IA", { ref: opcoes.novoRef, custoUsd: opcoes.custoUsd, permitirNegativo: true });
+    return ctx.conta.saldo;
+  }
+  const [r] = await sql()`select acertar_reserva(${ctx.conta.id}::uuid, ${ref}, ${real}, ${opcoes.custoUsd ?? null}, ${opcoes.descricao ?? null},
+    ${opcoes.novoRef ?? null}, ${opcoes.meta ? sql().json(opcoes.meta as never) : null}) as saldo`;
+  ctx.conta.saldo = Number(r.saldo);
+  return ctx.conta.saldo;
+}
+
 /** Devolve os créditos de uma ação que falhou (ex.: vídeo que não ficou pronto). Idempotente. */
 export async function estornar(ctx: Contexto, ref: string, descricao: string) {
   const db = sql();
   const [uso] = await db`select creditos from movimentos where conta_id = ${ctx.conta.id}::uuid and tipo = 'uso' and ref = ${ref} limit 1`;
   if (!uso) return;
   await db`select creditar(${ctx.conta.id}::uuid, ${-Number(uso.creditos)}, 'estorno', ${descricao}, ${ref}, ${ctx.userId}::uuid)`;
+}
+
+/** Confere que o perfil existe e pertence à conta (impede mexer no perfil de outra conta trocando o id). */
+export async function exigirPerfilDaConta(contaId: string, perfilId: string | null | undefined) {
+  if (!perfilId) throw new ErroHttp(400, "Perfil não informado.");
+  const [p] = await sql()`select 1 from perfis where id = ${perfilId} and conta_id = ${contaId}::uuid and not apagado`;
+  if (!p) throw new ErroHttp(403, "Este perfil não é desta conta.");
 }
 
 export function exigirRecurso(condicao: boolean, mensagem: string) {

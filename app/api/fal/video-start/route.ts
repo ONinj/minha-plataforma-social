@@ -1,16 +1,23 @@
 import { clienteFal, enviarImagemFal, mensagemErroFal, statusErroFal } from "@/lib/fal";
-import { conferirCaminho, linkDeLeitura } from "@/lib/servidor/arquivos";
+import { conferirCaminho, duracaoDoVideo, linkDeLeitura } from "@/lib/servidor/arquivos";
 import {
   MODO_NUVEM,
+  ErroHttp,
+  acertar,
   comSaldo,
   contexto,
-  debitar,
   exigirRecurso,
-  exigirSaldo,
+  reservar,
   responderErro,
   usdParaCreditos,
   type Contexto,
 } from "@/lib/servidor/contexto";
+
+/** Modelos do Seedance que a plataforma aceita (o navegador não escolhe outro modelo do fal.ai). */
+const MODELOS_SEEDANCE = ["bytedance/seedance-2.5"];
+const RESOLUCOES = ["480p", "720p", "1080p"];
+const PROPORCOES = ["9:16", "16:9", "1:1", "4:5", "3:4", "4:3", "21:9", "auto"];
+const DURACOES_VEO = ["4s", "6s", "8s"];
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,7 +44,7 @@ function custoVideo(ctx: Contexto, c: Corpo): number {
   if (c.familia === "veo") return (p.veo_por_segundo[c.modelo] ?? 0.4) * p.segundos_veo;
   const porSeg = p.seedance_por_segundo[c.resolucao ?? "720p"] ?? 0.47;
   const seg = Number(c.duracao) || p.segundos_seedance;
-  const ref = c.videoReferenciaCaminho ? (c.segundosReferencia ?? 10) * porSeg * p.seedance_referencia_fator : 0;
+  const ref = c.videoReferenciaCaminho ? (c.segundosReferencia ?? 15) * porSeg * p.seedance_referencia_fator : 0;
   return porSeg * seg + ref;
 }
 
@@ -49,6 +56,15 @@ export async function POST(req: Request) {
     let usd = 0;
     if (MODO_NUVEM) {
       ctx = await contexto(req);
+      // Nada do que vem do navegador decide o preço sem ser conferido aqui.
+      if (c.familia !== "veo" && c.familia !== "seedance") throw new ErroHttp(400, "Tipo de vídeo inválido.");
+      if (c.familia === "seedance") {
+        if (!MODELOS_SEEDANCE.includes(c.modelo)) c.modelo = MODELOS_SEEDANCE[0];
+        if (!RESOLUCOES.includes(c.resolucao ?? "")) c.resolucao = "720p";
+        const d = Math.round(Number(c.duracao));
+        c.duracao = d >= 3 && d <= 12 ? String(d) : undefined;
+      } else if (c.duracao && !DURACOES_VEO.includes(c.duracao)) c.duracao = undefined;
+      if (c.proporcao && !PROPORCOES.includes(c.proporcao)) c.proporcao = undefined;
       if (c.familia === "veo") exigirRecurso(ctx.recursos.veo.includes(c.modelo), "Este modelo do Veo não está no seu plano.");
       else {
         exigirRecurso(ctx.recursos.seedance, "O Seedance não está no seu plano.");
@@ -58,19 +74,29 @@ export async function POST(req: Request) {
       if (c.videoReferenciaCaminho) {
         exigirRecurso(ctx.recursos.biblioteca, "Vídeo de referência da biblioteca não está no seu plano.");
         conferirCaminho(ctx, c.videoReferenciaCaminho);
+        // A duração do vídeo de referência é medida no arquivo; se não der para ler, cobra pelo máximo usual (15 s).
+        const medida = await duracaoDoVideo(c.videoReferenciaCaminho);
+        c.segundosReferencia = Math.min(60, Math.max(1, Math.ceil(medida ?? Math.max(15, Number(c.segundosReferencia) || 0))));
       }
+      c.videoReferenciaUrl = undefined; // no modo nuvem, só vídeos do armazenamento da própria conta
       usd = custoVideo(ctx, c);
-      exigirSaldo(ctx, usdParaCreditos(ctx, usd));
     }
     const fal = clienteFal(req);
     if (!fal) return Response.json({ error: "Chave do fal.ai não configurada." }, { status: 400 });
 
+    // Reserva o valor do vídeo ANTES de enviar (pedidos ao mesmo tempo não usam o mesmo saldo).
+    const creditos = ctx ? usdParaCreditos(ctx, usd) : 0;
+    const nome = c.familia === "veo" ? "Vídeo Veo" : "Vídeo Seedance";
+    const reserva = ctx ? await reservar(ctx, { max: creditos, minimo: creditos, descricao: `${nome}${c.titulo ? ` · ${c.titulo}` : ""}` }) : null;
+
+    let requestId: string;
+    let endpoint: string;
+    try {
     const input: Record<string, unknown> = { prompt: c.prompt };
     if (c.resolucao) input.resolution = c.resolucao;
     if (c.duracao) input.duration = c.duracao;
 
     const referencia = c.videoReferenciaCaminho ? await linkDeLeitura(c.videoReferenciaCaminho, 6 * 3600) : c.videoReferenciaUrl;
-    let endpoint: string;
     if (referencia) {
       // Seedance "reference-to-video": anima a partir de um vídeo (e opcionalmente uma imagem).
       endpoint = `${c.modelo}/reference-to-video`;
@@ -87,23 +113,22 @@ export async function POST(req: Request) {
       if (c.proporcao) input.aspect_ratio = c.proporcao;
     }
 
-    let requestId: string;
-    try {
-      requestId = (await fal.queue.submit(endpoint, { input })).request_id;
+      try {
+        requestId = (await fal.queue.submit(endpoint, { input })).request_id;
+      } catch (erro) {
+        // Se o modelo recusar a proporção, tenta de novo deixando no automático.
+        if (statusErroFal(erro) !== 422 || !("aspect_ratio" in input)) throw erro;
+        delete input.aspect_ratio;
+        requestId = (await fal.queue.submit(endpoint, { input })).request_id;
+      }
     } catch (erro) {
-      // Se o modelo recusar a proporção, tenta de novo deixando no automático.
-      if (statusErroFal(erro) !== 422 || !("aspect_ratio" in input)) throw erro;
-      delete input.aspect_ratio;
-      requestId = (await fal.queue.submit(endpoint, { input })).request_id;
+      if (ctx && reserva) await acertar(ctx, reserva.ref, 0).catch(() => {});
+      throw erro;
     }
 
-    if (ctx) {
-      const nome = c.familia === "veo" ? "Vídeo Veo" : "Vídeo Seedance";
-      await debitar(ctx, usdParaCreditos(ctx, usd), `${nome}${c.titulo ? ` · ${c.titulo}` : ""}`, {
-        ref: requestId,
-        custoUsd: usd,
-        permitirNegativo: true,
-      });
+    if (ctx && reserva) {
+      // Guarda qual modelo gerou o vídeo: a devolução de créditos confere com o fal.ai por este endereço.
+      await acertar(ctx, reserva.ref, creditos, { custoUsd: usd, novoRef: requestId, meta: { endpoint }, descricao: reserva.descricao });
     }
     return comSaldo(Response.json({ endpoint, requestId }), ctx);
   } catch (erro) {

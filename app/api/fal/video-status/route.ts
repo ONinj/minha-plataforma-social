@@ -1,5 +1,5 @@
-import { clienteFal, mensagemErroFal } from "@/lib/fal";
-import { MODO_NUVEM, comSaldo, contexto, estornar, responderErro, type Contexto } from "@/lib/servidor/contexto";
+import { clienteFal, mensagemErroFal, statusErroFal } from "@/lib/fal";
+import { MODO_NUVEM, comSaldo, contexto, estornar, responderErro, sql, type Contexto } from "@/lib/servidor/contexto";
 
 export const runtime = "nodejs";
 
@@ -13,9 +13,16 @@ export async function GET(req: Request) {
     if (!fal) return Response.json({ error: "Chave do fal.ai não configurada." }, { status: 400 });
 
     const params = new URL(req.url).searchParams;
-    const endpoint = params.get("endpoint");
+    let endpoint = params.get("endpoint");
     const requestId = params.get("requestId");
     if (!endpoint || !requestId) return Response.json({ error: "Parâmetros ausentes." }, { status: 400 });
+    if (ctx) {
+      // No modo nuvem, só consulta vídeos cobrados desta conta, pelo modelo guardado na cobrança.
+      const [m] = await sql()`select meta from movimentos where conta_id = ${ctx.conta.id}::uuid and tipo = 'uso' and ref = ${requestId} limit 1`;
+      const salvo = (m?.meta as { endpoint?: string } | null)?.endpoint;
+      if (salvo) endpoint = salvo;
+      else if (!m) return Response.json({ error: "Vídeo não encontrado nesta conta." }, { status: 404 });
+    }
 
     const falhou = async (mensagem: string) => {
       if (ctx) await estornar(ctx, requestId, "Vídeo não ficou pronto: créditos devolvidos");
@@ -42,6 +49,11 @@ export async function GET(req: Request) {
       if (!dados?.video?.url) return falhou("O fal.ai não devolveu vídeo.");
       return Response.json({ pronto: true, url: dados.video.url });
     } catch (erro) {
+      // Só devolve créditos quando o fal.ai diz que o vídeo falhou. Resultado expirado/inexistente ou
+      // instabilidade do fal.ai não geram devolução (evita devolver um vídeo que já foi entregue).
+      const st = statusErroFal(erro);
+      if (st === 404 || st === 410) return Response.json({ pronto: true, erro: "O vídeo não está mais disponível no fal.ai." });
+      if (!st || st >= 500) return Response.json({ pronto: false });
       return falhou(`Erro do fal.ai: ${mensagemErroFal(erro)}`);
     }
   } catch (erro) {

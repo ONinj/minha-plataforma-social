@@ -6,6 +6,7 @@ import { api } from "@/lib/nuvem";
 import { useStore } from "@/lib/store";
 import { brl, formatarData } from "@/lib/util";
 import Icone from "../Icone";
+import Diagnostico from "../Diagnostico";
 
 type Painel = {
   resumo: {
@@ -214,7 +215,10 @@ export function VisaoGeral({ dados, recarregar }: { dados: Painel; recarregar: (
       <div className="grade-2">
         <ConfigPlataforma config={dados.config} aoSalvar={recarregar} />
         <div className="cartao">
-          <h3><Icone nome="config" /> Integrações</h3>
+          <div className="linha" style={{ justifyContent: "space-between" }}>
+            <h3 style={{ margin: 0 }}><Icone nome="config" /> Integrações</h3>
+            <Diagnostico rotulo="Diagnóstico" />
+          </div>
           <div className="lista" style={{ gap: 6 }}>
             {dados.integracoes.map((i) => (
               <div key={i.nome} className="linha" style={{ justifyContent: "space-between", fontSize: 13.5 }}>

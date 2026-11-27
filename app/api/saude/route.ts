@@ -1,5 +1,5 @@
 import { urlSupabase } from "@/lib/supabaseUrl";
-import { MODO_NUVEM, sql } from "@/lib/servidor/contexto";
+import { MODO_NUVEM, eAdminConfirmado, sql, usuarioDoToken } from "@/lib/servidor/contexto";
 import { asaas, asaasEmProducao } from "@/lib/servidor/asaas";
 
 export const runtime = "nodejs";
@@ -19,8 +19,14 @@ const VARIAVEIS = [
   "NEXT_PUBLIC_WHATSAPP",
 ];
 
-/** Diagnóstico da configuração (não mostra nenhum valor secreto, só se existe e se funciona). */
-export async function GET() {
+/**
+ * Diagnóstico da configuração. Para qualquer pessoa: só "ok" ou "erro" de cada parte.
+ * Para o administrador logado (token no cabeçalho): os detalhes (formato do banco, mensagens de erro, cobrança).
+ * Nunca mostra o valor de nenhuma chave.
+ */
+export async function GET(req: Request) {
+  const quem = await usuarioDoToken(req);
+  const admin = quem ? await eAdminConfirmado(quem.userId, quem.email, quem.token) : false;
   const r: Record<string, unknown> = { modo: MODO_NUVEM ? "nuvem" : "local" };
   r.variaveis = Object.fromEntries(VARIAVEIS.map((v) => [v, process.env[v]?.trim() ? "ok" : "FALTANDO"]));
   r.endereco_supabase = urlSupabase() || "FALTANDO";
@@ -62,7 +68,7 @@ export async function GET() {
     r.supabase_login = `ERRO: ${e instanceof Error ? e.message : String(e)}`;
   }
   // Cobrança: qual ambiente está em uso, se a chave combina com ele e se os avisos (webhook) estão chegando.
-  if (process.env.ASAAS_API_KEY) {
+  if (admin && process.env.ASAAS_API_KEY) {
     const prod = asaasEmProducao();
     r.asaas_ambiente_em_uso = prod ? "producao (cobrança real)" : `TESTE/sandbox (ASAAS_AMBIENTE está "${(process.env.ASAAS_AMBIENTE ?? "").trim() || "vazio"}"; para cobrar de verdade escreva producao)`;
     const chave = process.env.ASAAS_API_KEY.trim();
@@ -83,5 +89,18 @@ export async function GET() {
       r.asaas_ultimo_aviso = "rode supabase/migrations/005_diagnostico_asaas.sql para ver isto";
     }
   }
-  return Response.json(r, { headers: { "Cache-Control": "no-store" } });
+  if (admin) return Response.json(r, { headers: { "Cache-Control": "no-store" } });
+  const resumo = (v: unknown) => (typeof v === "string" && v.startsWith("ok") ? "ok" : v === undefined ? undefined : "ERRO");
+  return Response.json(
+    {
+      modo: r.modo,
+      variaveis: r.variaveis,
+      banco_endereco: resumo(r.banco_endereco),
+      banco_conexao: resumo(r.banco_conexao),
+      banco_tabelas: resumo(r.banco_tabelas),
+      supabase_login: resumo(r.supabase_login),
+      detalhes: "Os detalhes aparecem só para o administrador logado (Administração → Visão geral → Diagnóstico).",
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

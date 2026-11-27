@@ -1,4 +1,4 @@
-import { ErroHttp, contexto, responderErro, sql } from "@/lib/servidor/contexto";
+import { ErroHttp, contexto, exigirPerfilDaConta, responderErro, sql } from "@/lib/servidor/contexto";
 import { credencialDaPlataforma, listarMarcas } from "@/lib/servidor/metricool";
 import { perfisComPublicacao } from "@/lib/servidor/cota";
 
@@ -34,8 +34,11 @@ export async function POST(req: Request) {
     await exigirAdmin(req);
     const c = (await req.json()) as { conta: string; perfil: string; blogId?: string; nome?: string; link?: string };
     const db = sql();
+    await exigirPerfilDaConta(c.conta, c.perfil);
+    const link = c.link?.trim() || null;
+    if (link && !/^https:\/\//i.test(link)) throw new ErroHttp(400, "O link de conexão precisa começar com https://");
     if (!c.blogId) {
-      await db`delete from metricool_marcas where perfil_id = ${c.perfil} and origem = 'plataforma'`;
+      await db`delete from metricool_marcas where perfil_id = ${c.perfil} and conta_id = ${c.conta}::uuid and origem = 'plataforma'`;
       return Response.json({ ok: true });
     }
     const [lim] = await db`select coalesce((c.recursos_custom->>'perfis_publicacao')::int, (p.recursos->>'perfis_publicacao')::int, 0) as n, p.nome
@@ -44,9 +47,10 @@ export async function POST(req: Request) {
       throw new ErroHttp(400, `O plano ${lim?.nome ?? ""} desta conta permite publicação automática em ${lim?.n ?? 0} perfil(is). Mude o plano da conta ou tire a marca de outro perfil.`);
     }
     await db`insert into metricool_marcas (perfil_id, conta_id, blog_id, nome, origem, link_conexao)
-      values (${c.perfil}, ${c.conta}::uuid, ${c.blogId}, ${c.nome ?? null}, 'plataforma', ${c.link?.trim() || null})
-      on conflict (perfil_id) do update set conta_id = excluded.conta_id, blog_id = excluded.blog_id, nome = excluded.nome,
-        origem = 'plataforma', link_conexao = excluded.link_conexao, atualizado_em = now()`;
+      values (${c.perfil}, ${c.conta}::uuid, ${c.blogId}, ${c.nome ?? null}, 'plataforma', ${link})
+      on conflict (perfil_id) do update set blog_id = excluded.blog_id, nome = excluded.nome,
+        origem = 'plataforma', link_conexao = excluded.link_conexao, atualizado_em = now()
+      where metricool_marcas.conta_id = excluded.conta_id`;
     return Response.json({ ok: true });
   } catch (e) {
     return responderErro(e);

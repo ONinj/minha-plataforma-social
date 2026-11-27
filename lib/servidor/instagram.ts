@@ -61,8 +61,9 @@ export async function trocarCodigo(req: Request, code: string) {
 export async function salvarConexao(contaId: string, perfilId: string, c: Awaited<ReturnType<typeof trocarCodigo>>) {
   await sql()`insert into conexoes_instagram (perfil_id, conta_id, ig_user_id, username, token_cifrado, expira_em)
     values (${perfilId}, ${contaId}::uuid, ${c.igUserId}, ${c.username}, ${cifrar(c.token)}, ${c.expiraEm})
-    on conflict (perfil_id) do update set conta_id = excluded.conta_id, ig_user_id = excluded.ig_user_id, username = excluded.username,
-      token_cifrado = excluded.token_cifrado, expira_em = excluded.expira_em, atualizado_em = now()`;
+    on conflict (perfil_id) do update set ig_user_id = excluded.ig_user_id, username = excluded.username,
+      token_cifrado = excluded.token_cifrado, expira_em = excluded.expira_em, atualizado_em = now()
+    where conexoes_instagram.conta_id = excluded.conta_id`;
 }
 
 /** Renova tokens que vencem em menos de 15 dias (o Instagram dá mais 60 dias a cada renovação). */

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import { REDES, type Agendamento, type StatusAgendamento, type TipoConteudo } from "@/lib/tipos";
-import { agoraISO, formatarData, novoId } from "@/lib/util";
+import { agoraISO, formatarData, novoId, linkSeguro } from "@/lib/util";
 import { agendarNoInstagram, cancelarNoInstagram, sincronizarPublicacoes, useInstagram } from "@/lib/instagram";
 import Icone from "../Icone";
 import { BotaoBaixar, CartaoMidia } from "../MidiaView";
@@ -334,7 +334,7 @@ function SeloInstagram({ a }: { a: Agendamento }) {
   if (!a.publicarAuto || !p || p.status === "cancelada") return null;
   if (p.status === "publicada")
     return p.permalink ? (
-      <a className="etiqueta" href={p.permalink} target="_blank" rel="noreferrer" style={{ color: "var(--ok)" }}>
+      <a className="etiqueta" href={linkSeguro(p.permalink)} target="_blank" rel="noreferrer" style={{ color: "var(--ok)" }}>
         📸 Publicado ↗
       </a>
     ) : (
@@ -378,7 +378,7 @@ function PainelInstagram({ item, aoFechar }: { item: Agendamento; aoFechar: () =
         <p className="ajuda" style={{ marginBottom: 0 }}>
           Publicado{ig.destino ? ` (${ig.destino.nome})` : ""}.{" "}
           {p.permalink && (
-            <a href={p.permalink} target="_blank" rel="noreferrer">
+            <a href={linkSeguro(p.permalink)} target="_blank" rel="noreferrer">
               Ver a publicação
             </a>
           )}

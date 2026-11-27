@@ -73,17 +73,30 @@ function caminho(blobId: string) {
   return `${contaAtual}/${blobId.replace(/[^\w.\-]/g, "_")}`;
 }
 
+/** Tipo do arquivo para o armazenamento (que só aceita imagem, vídeo, áudio e PDF). */
+function tipoDoArquivo(blobId: string, blob: Blob) {
+  if (blob.type) return blob.type;
+  const ext = blobId.split(".").pop()?.toLowerCase() ?? "";
+  if (["jpg", "jpeg"].includes(ext)) return "image/jpeg";
+  if (["png", "webp", "gif"].includes(ext)) return `image/${ext}`;
+  if (["mp4", "mov"].includes(ext) || blobId.startsWith("vid") || blobId.startsWith("trecho")) return "video/mp4";
+  if (blobId.startsWith("voz")) return "audio/webm";
+  if (ext === "pdf") return "application/pdf";
+  return "image/png";
+}
+
 export async function enviarArquivo(blobId: string, blob: Blob): Promise<string> {
   const { url, token, caminho: c } = await api<{ url: string; token: string; caminho: string }>("/api/arquivos", {
     corpo: { acao: "enviar", nome: blobId },
   });
+  const tipo = tipoDoArquivo(blobId, blob);
   const { error } = await supabase().storage.from("midias").uploadToSignedUrl(c, token, blob, {
-    contentType: blob.type || "application/octet-stream",
+    contentType: tipo,
     upsert: true,
   });
   if (error) {
     // Alternativa: PUT direto no link assinado.
-    const r = await fetch(url, { method: "PUT", body: blob, headers: { "Content-Type": blob.type || "application/octet-stream" } });
+    const r = await fetch(url, { method: "PUT", body: blob, headers: { "Content-Type": tipo } });
     if (!r.ok) throw new Error(`Falha ao enviar arquivo (${error.message})`);
   }
   return c;

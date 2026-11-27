@@ -1,4 +1,4 @@
-import { caminhoDaConta, conferirCaminho, linkDeEnvio, linkDeLeitura, apagarArquivos } from "@/lib/servidor/arquivos";
+import { caminhoDaConta, conferirCaminho, conferirCota, linkDeEnvio, linkDeLeitura, apagarArquivos } from "@/lib/servidor/arquivos";
 import { contexto, responderErro } from "@/lib/servidor/contexto";
 
 export const runtime = "nodejs";
@@ -13,7 +13,10 @@ export async function POST(req: Request) {
   try {
     const ctx = await contexto(req);
     const c = (await req.json()) as { acao: string; nome?: string; caminhos?: string[] };
-    if (c.acao === "enviar") return Response.json(await linkDeEnvio(caminhoDaConta(ctx, c.nome ?? "arquivo")));
+    if (c.acao === "enviar") {
+      await conferirCota(ctx);
+      return Response.json(await linkDeEnvio(caminhoDaConta(ctx, String(c.nome ?? "arquivo").slice(0, 120))));
+    }
     const caminhos = (c.caminhos ?? []).slice(0, 100);
     caminhos.forEach((p) => conferirCaminho(ctx, p));
     if (c.acao === "ler") {

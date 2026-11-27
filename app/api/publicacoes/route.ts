@@ -1,5 +1,5 @@
 import { conferirCaminho, linkDeLeitura } from "@/lib/servidor/arquivos";
-import { ErroHttp, contexto, exigirRecurso, responderErro, sql } from "@/lib/servidor/contexto";
+import { ErroHttp, contexto, exigirPerfilDaConta, exigirRecurso, responderErro, sql } from "@/lib/servidor/contexto";
 import { avancarPublicacao } from "@/lib/servidor/instagram";
 import * as metricool from "@/lib/servidor/metricool";
 import { conferirCota } from "@/lib/servidor/cota";
@@ -65,6 +65,7 @@ export async function POST(req: Request) {
     const ctx = await contexto(req);
     const c = (await req.json()) as Corpo;
     const db = sql();
+    await exigirPerfilDaConta(ctx.conta.id, c.perfil);
     if (!c.midias?.length) throw new ErroHttp(400, "A publicação precisa de pelo menos uma imagem ou vídeo.");
     if (c.tipo === "reels" && c.midias[0].tipo !== "video") throw new ErroHttp(400, "Reels precisa de um vídeo.");
     if (c.tipo === "carrossel" && (c.midias.length < 2 || c.midias.length > 10)) throw new ErroHttp(400, "Carrossel precisa de 2 a 10 mídias.");

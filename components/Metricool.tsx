@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { atualizarConexoes, useCota, useInstagram } from "@/lib/instagram";
 import { api } from "@/lib/nuvem";
 import { useStore } from "@/lib/store";
+import { linkSeguro } from "@/lib/util";
 import Icone from "./Icone";
 
 /** Configurações → "Meu próprio Metricool": quem já assina o Metricool Advanced liga o dele. */
@@ -147,8 +148,8 @@ export function CartaoMetricool() {
           No calendário, ative &quot;Publicar automaticamente&quot; em cada post. As redes marcadas no post saem juntas.
         </p>
         <LinhaCota />
-        {marca.link_conexao && (
-          <a className="botao sec peq" href={marca.link_conexao} target="_blank" rel="noreferrer">
+        {linkSeguro(marca.link_conexao) && (
+          <a className="botao sec peq" href={linkSeguro(marca.link_conexao)} target="_blank" rel="noreferrer">
             <Icone nome="instagram" tamanho={15} /> Conectar / reconectar minhas redes
           </a>
         )}

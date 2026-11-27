@@ -60,3 +60,8 @@ export function baixarArquivo(url: string, nome: string) {
   a.download = nome;
   a.click();
 }
+
+/** Só deixa passar links https (evita links "javascript:" ou de outros tipos vindos de fora). */
+export function linkSeguro(url: string | null | undefined): string | undefined {
+  return url && /^https:\/\//i.test(url.trim()) ? url.trim() : undefined;
+}

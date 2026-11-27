@@ -1,6 +1,6 @@
 import { assinar } from "@/lib/servidor/cripto";
 import { urlDeAutorizacao } from "@/lib/servidor/instagram";
-import { ErroHttp, contexto, exigirRecurso, responderErro } from "@/lib/servidor/contexto";
+import { ErroHttp, contexto, exigirPerfilDaConta, exigirRecurso, responderErro } from "@/lib/servidor/contexto";
 import { perfisComPublicacao } from "@/lib/servidor/cota";
 
 export const runtime = "nodejs";
@@ -14,6 +14,7 @@ export async function POST(req: Request) {
       throw new ErroHttp(400, "A conexão com o Instagram ainda não foi configurada na plataforma.");
     }
     const { perfil } = (await req.json()) as { perfil: string };
+    await exigirPerfilDaConta(ctx.conta.id, perfil);
     const limite = ctx.recursos.perfis_publicacao ?? 99;
     if ((await perfisComPublicacao(ctx.conta.id, perfil)) >= limite) {
       throw new ErroHttp(403, `Seu plano permite publicação automática em ${limite} perfil(is). Desconecte outro perfil ou mude de plano.`, "plano");

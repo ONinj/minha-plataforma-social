@@ -10,6 +10,7 @@ import { brl } from "@/lib/util";
 import Admin from "./abas/Admin";
 import Plano from "./abas/Plano";
 import Login, { NovaSenha } from "./Login";
+import Diagnostico from "./Diagnostico";
 import Agendamentos from "./abas/Agendamentos";
 import Aprovacoes from "./abas/Aprovacoes";
 import Biblioteca from "./abas/Biblioteca";
@@ -178,10 +179,8 @@ function Plataforma() {
           <h2 className="titulo-pagina">Não consegui abrir sua conta</h2>
           <p className="ajuda">O login funcionou, mas o servidor respondeu com este erro:</p>
           <div className="erro-msg">{store.erroCarga}</div>
-          <p className="ajuda">
-            Se você é o administrador, abra <a href="/api/saude" target="_blank">/api/saude</a> para ver o que está faltando na
-            configuração.
-          </p>
+          <p className="ajuda">Se você é o administrador, veja o que está faltando na configuração:</p>
+          <Diagnostico />
           <div className="linha" style={{ justifyContent: "flex-end" }}>
             <button className="botao sec" onClick={() => store.sair()}>Sair</button>
             <button className="botao" onClick={() => window.location.reload()}>Tentar de novo</button>
