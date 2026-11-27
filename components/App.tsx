@@ -19,6 +19,7 @@ import Biblioteca from "./abas/Biblioteca";
 import ClaudeDireto from "./abas/ClaudeDireto";
 import Configuracoes from "./abas/Configuracoes";
 import Gemini from "./abas/Gemini";
+import Editor from "./abas/Editor";
 import Gerente from "./abas/Gerente";
 import Ideias from "./abas/Ideias";
 import Inicio from "./abas/Inicio";
@@ -36,6 +37,7 @@ export type IdAba =
   | "gemini"
   | "veo"
   | "seedance"
+  | "editor"
   | "aprovacoes"
   | "agendamentos"
   | "midias"
@@ -58,6 +60,7 @@ const SECOES: { titulo?: string; abas: Aba[] }[] = [
       { id: "gemini", nome: "Imagens", icone: "imagem", descricao: "Nano Banana 2: cards, stories e referências", cor: "var(--gemini)" },
       { id: "veo", nome: "Veo", icone: "video", descricao: "Vídeos curtos com o Veo 3.1", cor: "var(--veo)" },
       { id: "seedance", nome: "Seedance", icone: "filme", descricao: "Vídeos cinematográficos com o Seedance", cor: "var(--seedance)" },
+      { id: "editor", nome: "Editor de vídeo", icone: "editar", descricao: "O Claude edita o seu vídeo gravado: corta, legenda e encaixa no planejamento" },
     ],
   },
   {
@@ -403,6 +406,7 @@ function Plataforma() {
           )}
           {aba === "ideias" && <Ideias falarComGerente={falarComGerente} />}
           {aba === "perfis" && <Perfis falarComGerente={falarComGerente} />}
+          {aba === "editor" && <Editor ir={ir} />}
           {aba === "config" && <Configuracoes />}
           {aba === "plano" && nuvem && <Plano />}
           {aba === "admin" && nuvem?.usuario.admin && <Admin />}
